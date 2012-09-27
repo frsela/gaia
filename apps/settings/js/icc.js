@@ -70,6 +70,10 @@
           }
         }
         break;
+      case icc.STK_CMD_SET_UP_EVENT_LIST:
+        console.log(' STK:SetUp Event List. Events list: ' + command.options.eventList);
+        icc.sendStkResponse(command, { resultCode: icc.STK_RESULT_OK });
+        break;
       default:
         console.log('STK Message not managed ... response OK');
         icc.sendStkResponse(command, { resultCode: icc.STK_RESULT_OK });
