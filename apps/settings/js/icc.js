@@ -16,6 +16,27 @@
   var iccStkSelection = document.getElementById('icc-stk-selection');
   var iccLastCommand = null;
 
+  // DEBUG: Fake events
+  console.log('STK Fake STK Events');
+  processSTKEvents([icc.STK_EVENT_TYPE_MT_CALL,
+                    icc.STK_EVENT_TYPE_CALL_CONNECTED,
+                    icc.STK_EVENT_TYPE_CALL_DISCONNECTED,
+                    icc.STK_EVENT_TYPE_LOCATION_STATUS,
+                    icc.STK_EVENT_TYPE_USER_ACTIVITY,
+                    icc.STK_EVENT_TYPE_IDLE_SCREEN_AVAILABLE,
+                    icc.STK_EVENT_TYPE_CARD_READER_STATUS,
+                    icc.STK_EVENT_TYPE_LANGUAGE_SELECTION,
+                    icc.STK_EVENT_TYPE_BROWSER_TERMINATION,
+                    icc.STK_EVENT_TYPE_DATA_AVAILABLE,
+                    icc.STK_EVENT_TYPE_CHANNEL_STATUS,
+                    icc.STK_EVENT_TYPE_SINGLE_ACCESS_TECHNOLOGY_CHANGED,
+                    icc.STK_EVENT_TYPE_DISPLAY_PARAMETER_CHANGED,
+                    icc.STK_EVENT_TYPE_LOCAL_CONNECTION,
+                    icc.STK_EVENT_TYPE_NETWORK_SEARCH_MODE_CHANGED,
+                    icc.STK_EVENT_TYPE_BROWSING_STATUS,
+                    icc.STK_EVENT_TYPE_FRAMES_INFORMATION_CHANGED]);
+  // DEBUG: END
+
   function handleSTKCommand(command) {
     console.log('STK Proactive Command:', JSON.stringify(command));
     switch (command.typeOfCommand) {
@@ -72,6 +93,7 @@
         break;
       case icc.STK_CMD_SET_UP_EVENT_LIST:
         console.log(' STK:SetUp Event List. Events list: ' + command.options.eventList);
+        processSTKEvents(command.options.eventList);
         icc.sendStkResponse(command, { resultCode: icc.STK_RESULT_OK });
         break;
       default:
@@ -86,6 +108,56 @@
    */
   function handleSTKSessionEnd(event) {
     updateMenu();
+  }
+
+  /**
+   * Process STK Events
+   */
+  function processSTKEvents(eventList) {
+    for (var evt in eventList) {
+      console.log(' STK Registering event: ' + JSON.stringify(eventList[evt]));
+      switch (eventList[evt]) {
+      case icc.STK_EVENT_TYPE_MT_CALL:
+      case icc.STK_EVENT_TYPE_CALL_CONNECTED:
+      case icc.STK_EVENT_TYPE_CALL_DISCONNECTED:
+        console.log(' [DEBUG] STK TODO event: ' + JSON.stringify(evt));
+        break;
+      case icc.STK_EVENT_TYPE_LOCATION_STATUS:
+        console.log(' STK: Registering to location changes event');
+        var conn = window.navigator.mozMobileConnection;
+        conn.addEventListener('voicechange', handleLocationStatusEvent);
+        conn.addEventListener('datachange', handleLocationStatusEvent);
+        break;
+      case icc.STK_EVENT_TYPE_USER_ACTIVITY:
+      case icc.STK_EVENT_TYPE_IDLE_SCREEN_AVAILABLE:
+      case icc.STK_EVENT_TYPE_CARD_READER_STATUS:
+      case icc.STK_EVENT_TYPE_LANGUAGE_SELECTION:
+      case icc.STK_EVENT_TYPE_BROWSER_TERMINATION:
+      case icc.STK_EVENT_TYPE_DATA_AVAILABLE:
+      case icc.STK_EVENT_TYPE_CHANNEL_STATUS:
+      case icc.STK_EVENT_TYPE_SINGLE_ACCESS_TECHNOLOGY_CHANGED:
+      case icc.STK_EVENT_TYPE_DISPLAY_PARAMETER_CHANGED:
+      case icc.STK_EVENT_TYPE_LOCAL_CONNECTION:
+      case icc.STK_EVENT_TYPE_NETWORK_SEARCH_MODE_CHANGED:
+      case icc.STK_EVENT_TYPE_BROWSING_STATUS:
+      case icc.STK_EVENT_TYPE_FRAMES_INFORMATION_CHANGED:
+        console.log(' [DEBUG] STK TODO event: ' + JSON.stringify(evt));
+        break;
+      }
+    }
+  }
+
+  /**
+   * Handle Events
+   */
+  function handleLocationStatusEvent(evt) {
+    if(evt.type != 'voicechange') {
+      return;
+    }
+    var conn = window.navigator.mozMobileConnection;
+    console.log(' STK Location changed to MCC=' + conn.iccInfo.mcc +
+      ' MNC=' + conn.iccInfo.mnc);
+    // TODO: Notify to the ICC
   }
 
   /**
