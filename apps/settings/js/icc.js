@@ -120,7 +120,9 @@
       case icc.STK_EVENT_TYPE_MT_CALL:
       case icc.STK_EVENT_TYPE_CALL_CONNECTED:
       case icc.STK_EVENT_TYPE_CALL_DISCONNECTED:
-        console.log(' [DEBUG] STK TODO event: ' + JSON.stringify(evt));
+        console.log(' STK: Registering to communications changes event');
+        var comm = navigator.mozTelephony;
+        comm.addEventListener('callschanged', handleCallsChangeEvent);
         break;
       case icc.STK_EVENT_TYPE_LOCATION_STATUS:
         console.log(' STK: Registering to location changes event');
@@ -158,6 +160,32 @@
     console.log(' STK Location changed to MCC=' + conn.iccInfo.mcc +
       ' MNC=' + conn.iccInfo.mnc);
     // TODO: Notify to the ICC
+  }
+  function handleCallsChangeEvent(evt) {
+    console.log(' STK Communication changed');
+    navigator.mozTelephony.calls.forEach(function callIterator(call) {
+      console.log( ' STK:CALLS State change: ' + call.state);
+      switch(call.state) {
+        case 'incoming':
+          // TODO: Notify to the ICC
+          break;
+        case 'dialing':
+          // TODO: Notify to the ICC
+          break;
+      }
+      call.addEventListener('statechange',function callStateChange(){      
+        console.log(' STK:CALL State Change: ' + call.state);
+        switch(call.state) {
+          case 'connected':
+            // TODO: Notify to the ICC
+            break;
+          case 'disconnected':
+            call.removeEventListener('statechange', callStateChange);
+            // TODO: Notify to the ICC
+            break;
+        }
+      })
+    });
   }
 
   /**
