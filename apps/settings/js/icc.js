@@ -18,7 +18,7 @@
   var iccLastCommand = null;
 
   // DEBUG: Fake events
-  console.log('STK Fake STK Events');
+  debug('STK Fake STK Events');
   processSTKEvents([icc.STK_EVENT_TYPE_MT_CALL,
                     icc.STK_EVENT_TYPE_CALL_CONNECTED,
                     icc.STK_EVENT_TYPE_CALL_DISCONNECTED,
@@ -93,8 +93,8 @@
         }
         break;
       case icc.STK_CMD_SET_UP_EVENT_LIST:
-        console.log(' STK:SetUp Event List. Events list: ' + command.options.eventList);
-        processSTKEvents(command.options.eventList);
+        debug(' STK:SetUp Event List. Events list: ' + options.eventList);
+        processSTKEvents(options.eventList);
         icc.sendStkResponse(command, { resultCode: icc.STK_RESULT_OK });
         break;
       default:
@@ -116,17 +116,17 @@
    */
   function processSTKEvents(eventList) {
     for (var evt in eventList) {
-      console.log(' STK Registering event: ' + JSON.stringify(eventList[evt]));
+      debug(' STK Registering event: ' + JSON.stringify(eventList[evt]));
       switch (eventList[evt]) {
       case icc.STK_EVENT_TYPE_MT_CALL:
       case icc.STK_EVENT_TYPE_CALL_CONNECTED:
       case icc.STK_EVENT_TYPE_CALL_DISCONNECTED:
-        console.log(' STK: Registering to communications changes event');
+        debug(' STK: Registering to communications changes event');
         var comm = navigator.mozTelephony;
         comm.addEventListener('callschanged', handleCallsChangeEvent);
         break;
       case icc.STK_EVENT_TYPE_LOCATION_STATUS:
-        console.log(' STK: Registering to location changes event');
+        debug(' STK: Registering to location changes event');
         var conn = window.navigator.mozMobileConnection;
         conn.addEventListener('voicechange', handleLocationStatusEvent);
         conn.addEventListener('datachange', handleLocationStatusEvent);
@@ -144,7 +144,7 @@
       case icc.STK_EVENT_TYPE_NETWORK_SEARCH_MODE_CHANGED:
       case icc.STK_EVENT_TYPE_BROWSING_STATUS:
       case icc.STK_EVENT_TYPE_FRAMES_INFORMATION_CHANGED:
-        console.log(' [DEBUG] STK TODO event: ' + JSON.stringify(evt));
+        debug(' [DEBUG] STK TODO event: ' + JSON.stringify(evt));
         break;
       }
     }
@@ -154,20 +154,20 @@
    * Handle Events
    */
   function handleLocationStatusEvent(evt) {
-    if(evt.type != 'voicechange') {
+    if (evt.type != 'voicechange') {
       return;
     }
     var conn = window.navigator.mozMobileConnection;
-    console.log(' STK Location changed to MCC=' + conn.iccInfo.mcc +
+    debug(' STK Location changed to MCC=' + conn.iccInfo.mcc +
       ' MNC=' + conn.iccInfo.mnc +
       ' LAC=' + conn.voice.cell.gsmLocationAreaCode +
       ' CellId=' + conn.voice.cell.gsmCellId +
       ' Status/Connected=' + conn.voice.connected +
       ' Status/Emergency=' + conn.voice.emergencyCallsOnly);
     var status = icc.STK_SERVICE_STATE_UNAVAILABLE;
-    if(conn.voice.connected) {
+    if (conn.voice.connected) {
       status = icc.STK_SERVICE_STATE_NORMAL;
-    } else if(conn.voice.emergencyCallsOnly) {
+    } else if (conn.voice.emergencyCallsOnly) {
       status = icc.STK_SERVICE_STATE_LIMITED;
     }
     icc.sendStkEventDownload({
@@ -182,9 +182,12 @@
     });
   }
   function handleCallsChangeEvent(evt) {
-    console.log(' STK Communication changed');
+    if (evt.type != 'callschanged') {
+      return;
+    }
+    debug(' STK Communication changed - ' + evt.type);
     navigator.mozTelephony.calls.forEach(function callIterator(call) {
-      console.log( ' STK:CALLS State change: ' + call.state);
+      debug( ' STK:CALLS State change: ' + call.state);
       switch(call.state) {
         case 'incoming':
           // TODO: Notify to the ICC
@@ -194,7 +197,7 @@
           break;
       }
       call.addEventListener('statechange',function callStateChange(){      
-        console.log(' STK:CALL State Change: ' + call.state);
+        debug(' STK:CALL State Change: ' + call.state);
         switch(call.state) {
           case 'connected':
             // TODO: Notify to the ICC
