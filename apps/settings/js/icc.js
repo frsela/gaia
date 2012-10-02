@@ -253,7 +253,7 @@
       document.getElementById('icc-stk-operator-header').textContent = menu.title;
       menu.items.forEach(function (menuItem) {
         debug('STK Main App Menu item:' + menuItem.text + ' # ' +
-              menuItem.identifer);
+              menuItem.identifier);
         iccStkAppsList.appendChild(getDOMMenuEntry({
           id: 'stk-menuitem-' + menuItem.identifier,
           text: menuItem.text,
@@ -299,7 +299,7 @@
     debug('STK App Menu title: ' + menu.title);
     debug('STK App Menu default item: ' + menu.defaultItem);
     menu.items.forEach(function (menuItem) {
-      debug('STK App Menu item: ' + menuItem.text + ' # ' + menuItem.identifer);
+      debug('STK App Menu item: ' + menuItem.text + ' # ' + menuItem.identifier);
       iccStkSelection.appendChild(getDOMMenuEntry({
         id: 'stk-menuitem-' + menuItem.identifier,
         text: menuItem.text,
