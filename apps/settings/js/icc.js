@@ -71,8 +71,8 @@
 
       case icc.STK_CMD_DISPLAY_TEXT:
         debug(' STK:Show message: ' + JSON.stringify(command));
-        icc.sendStkResponse(command, { resultCode: icc.STK_RESULT_OK });
         alert(options.text);
+        icc.sendStkResponse(command, { resultCode: icc.STK_RESULT_OK });
         break;
 
       case icc.STK_CMD_SEND_SMS:
