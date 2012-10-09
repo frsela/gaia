@@ -195,6 +195,19 @@
         }
         break;
 
+      case icc.STK_CMD_PLAY_TONE:
+        debug(' STK:Play Tone: ' + JSON.stringify(otions));
+        /*
+         * options.text
+         * options.tone
+         * options.duration.timeUnit
+         * options.duration.timeInterval
+         * options.isVibrate
+         */
+        iccLastCommandProcessed = true;
+        responseSTKCommand({ resultCode: icc.STK_RESULT_OK });
+        break;
+
       default:
         debug('STK Message not managed ... response OK');
         alert('[DEBUG] TODO: ' + JSON.stringify(command));
