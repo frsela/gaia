@@ -132,22 +132,15 @@ fieldset section p:last-child {
 
 /* Tidy (search/submit) */
 form[role="search"] {
-  background: #e8e8e8 url(input_areas/images/ui/background.png) repeat-x left bottom;
+  background: #e8e8e8 url(input_areas/images/ui/background.png) repeat-x left top;
   height: 3.7rem;
   position: relative;
 }
 
-form[role="search"].full p {
-  width: 100%;
-  background: none;
-}
-
-form[role="search"].full button[type="submit"] {
-  position: absolute;
-  left: 100%;
-  top: 0;
-  width: 0;
-  font-size: 0;
+section[role="region"] > header:first-child + form[role="search"] { 
+  /* increase height when underneath a header because of header´s shadow */
+  padding-top: 0.3rem;
+  border-bottom: 0.1rem solid #c8c8c8;
 }
 
 form[role="search"]:after {
@@ -172,11 +165,19 @@ form[role="search"].bottom:after {
   background: url(input_areas/images/ui/shadow-invert.png) repeat-x left bottom;
 }
 
+section[role="region"] > header:first-child + form[role="search"]:after{ 
+  background: none;
+}
+
 form[role="search"] p {
   display: block;
   overflow: hidden;
   -moz-box-sizing: border-box;
   padding: 0.3rem 1.2rem;
+}
+
+form[role="search"].full p {
+  padding: 0.3rem 2.5rem;
 }
 
 form[role="search"] p input {
@@ -195,15 +196,22 @@ form[role="search"] p button[type="reset"] {
   right: 1rem;
 }
 
+form[role="search"].full p button[type="reset"] {
+  right: 2.3rem;
+}
+
 form[role="search"] button[type="submit"] {
   background: url(input_areas/images/ui/separator.png) no-repeat left center, url(input_areas/images/ui/active.png) repeat-x left bottom;
   border: none;
   float: right;
-  width: 6rem;
+  min-width: 6rem;
   height: 3.7rem;
-  padding: 0;
+  padding: 0 0.4rem;
   font: 600 1.4rem/3.2rem "Open Sans", Sans-serif;
   color: #333;
+}
+form[role="search"].full button[type="submit"] {
+  display: none;
 }
 
 form[role="search"] button[type="submit"]:active {

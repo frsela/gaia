@@ -1,0 +1,39 @@
+        
+        
+        
+dictionary MozStkSetUpEventList
+{
+  /**
+   * The list of events that needs to provide details to ICC when they happen.
+   * When this valus is null, means an indication to remove the existing list
+   * of events in ME.
+   *
+   * @see nsIDOMMozIccManager.STK_EVENT_TYPE_*
+   */
+   jsval eventList; // unsigned short []
+};
+
+        
+        
+  /**
+   * STK Event List
+   */
+   const unsigned short STK_EVENT_TYPE_MT_CALL                          = 0x00;
+   const unsigned short STK_EVENT_TYPE_CALL_CONNECTED                   = 0x01;
+   const unsigned short STK_EVENT_TYPE_CALL_DISCONNECTED                = 0x02;
+   const unsigned short STK_EVENT_TYPE_LOCATION_STATUS                  = 0x03;
+   const unsigned short STK_EVENT_TYPE_USER_ACTIVITY                    = 0x04;
+   const unsigned short STK_EVENT_TYPE_IDLE_SCREEN_AVAILABLE            = 0x05;
+   const unsigned short STK_EVENT_TYPE_CARD_READER_STATUS               = 0x06;
+   const unsigned short STK_EVENT_TYPE_LANGUAGE_SELECTION               = 0x07;
+   const unsigned short STK_EVENT_TYPE_BROWSER_TERMINATION              = 0x08;
+   const unsigned short STK_EVENT_TYPE_DATA_AVAILABLE                   = 0x09;
+   const unsigned short STK_EVENT_TYPE_CHANNEL_STATUS                   = 0x0a;
+   const unsigned short STK_EVENT_TYPE_SINGLE_ACCESS_TECHNOLOGY_CHANGED = 0x0b;
+   const unsigned short STK_EVENT_TYPE_DISPLAY_PARAMETER_CHANGED        = 0x0c;
+   const unsigned short STK_EVENT_TYPE_LOCAL_CONNECTION                 = 0x0d;
+   const unsigned short STK_EVENT_TYPE_NETWORK_SEARCH_MODE_CHANGED      = 0x0e;
+   const unsigned short STK_EVENT_TYPE_BROWSING_STATUS                  = 0x0f;
+   const unsigned short STK_EVENT_TYPE_FRAMES_INFORMATION_CHANGED       = 0x10;
+
+
