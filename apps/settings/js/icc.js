@@ -82,6 +82,7 @@
      */
     iccMenuItem.onclick = function onclick() {
       updateMenu();
+      playTone({'tone': icc.STK_TONE_TYPE_DIAL_TONE, 'text': 'Test Tone', 'isVibrate': true, 'duration': { 'timeUnit': icc.STK_TIME_UNIT_SECOND, 'timeInterval': 2}});
     };
   }
 
