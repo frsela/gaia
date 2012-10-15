@@ -197,13 +197,7 @@
 
       case icc.STK_CMD_PLAY_TONE:
         debug(' STK:Play Tone: ' + JSON.stringify(otions));
-        /*
-         * options.text
-         * options.tone
-         * options.duration.timeUnit
-         * options.duration.timeInterval
-         * options.isVibrate
-         */
+        playTone(options);
         iccLastCommandProcessed = true;
         responseSTKCommand({ resultCode: icc.STK_RESULT_OK });
         break;
@@ -402,6 +396,58 @@
 
     alertbox_msg.textContent = options.text;
     alertbox.classList.remove('hidden');
+  }
+
+  /**
+   * Play tones
+   */
+  function playTone(options) {
+    debug("playTone: " + JSON.stringify(options));
+
+    var tonePlayer = new Audio();
+    var selectedPhoneSound;
+    switch (options.tone) {
+      case icc.STK_TONE_TYPE_DIAL_TONE:
+      case icc.STK_TONE_TYPE_CALLED_SUBSCRIBER_BUSY:
+      case icc.STK_TONE_TYPE_CONGESTION:
+      case icc.STK_TONE_TYPE_RADIO_PATH_ACK:
+      case icc.STK_TONE_TYPE_RADIO_PATH_NOT_AVAILABLE:
+      case icc.STK_TONE_TYPE_ERROR:
+      case icc.STK_TONE_TYPE_CALL_WAITING_TONE:
+      case icc.STK_TONE_TYPE_RINGING_TONE:
+      case icc.STK_TONE_TYPE_GENERAL_BEEP:
+      case icc.STK_TONE_TYPE_POSITIVE_ACK_TONE:
+      case icc.STK_TONE_TYPE_NEGATIVE_ACK_TONE:
+        selectedPhoneSound = 'style/ringtones/classic.ogg';
+        break;
+    }
+    tonePlayer.src = selectedPhoneSound;
+    tonePlayer.loop = true;
+    tonePlayer.play();
+
+    var timeout = options.duration.timeInterval;
+    switch (options.duration.timeUnit) {
+      case icc.STK_TIME_UNIT_MINUTE:
+        timeout *= 3600000;
+        break;
+      case icc.STK_TIME_UNIT_SECOND:
+        timeout *= 1000;
+        break;
+      case icc.STK_TIME_UNIT_TENTH_SECOND:
+        timeout *= 100;
+        break;
+    }
+    setTimeout(function() {
+      tonePlayer.pause();
+    },timeout);
+
+    if (options.isVibrate == true) {
+      navigator.vibrate([200]);
+    }
+
+    if (options.text) {
+      alert(options.text);
+    }
   }
 
   /**
