@@ -9,6 +9,7 @@
    */
   var displayTextTimeout = 10000;
   var DEBUG = false;
+  var FAKE_EVENTS = false;
 
   /**
    * Debug method
@@ -63,6 +64,30 @@
           resultCode: icc.STK_RESULT_NO_RESPONSE_FROM_USER
         }, true);
       };
+
+      /**
+       * Register all events (FAKE events for testing/debugging)
+       */
+      if (FAKE_EVENTS) {
+        debug('STK Fake STK Events');
+        processSTKEvents([icc.STK_EVENT_TYPE_MT_CALL,
+                          icc.STK_EVENT_TYPE_CALL_CONNECTED,
+                          icc.STK_EVENT_TYPE_CALL_DISCONNECTED,
+                          icc.STK_EVENT_TYPE_LOCATION_STATUS,
+                          icc.STK_EVENT_TYPE_USER_ACTIVITY,
+                          icc.STK_EVENT_TYPE_IDLE_SCREEN_AVAILABLE,
+                          icc.STK_EVENT_TYPE_CARD_READER_STATUS,
+                          icc.STK_EVENT_TYPE_LANGUAGE_SELECTION,
+                          icc.STK_EVENT_TYPE_BROWSER_TERMINATION,
+                          icc.STK_EVENT_TYPE_DATA_AVAILABLE,
+                          icc.STK_EVENT_TYPE_CHANNEL_STATUS,
+                          icc.STK_EVENT_TYPE_SINGLE_ACCESS_TECHNOLOGY_CHANGED,
+                          icc.STK_EVENT_TYPE_DISPLAY_PARAMETER_CHANGED,
+                          icc.STK_EVENT_TYPE_LOCAL_CONNECTION,
+                          icc.STK_EVENT_TYPE_NETWORK_SEARCH_MODE_CHANGED,
+                          icc.STK_EVENT_TYPE_BROWSING_STATUS,
+                          icc.STK_EVENT_TYPE_FRAMES_INFORMATION_CHANGED]);
+      }
 
       navigator.mozSetMessageHandler('icc-stkcommand', handleSTKCommand);
     }
