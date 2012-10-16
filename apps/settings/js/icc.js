@@ -73,6 +73,7 @@
     iccMenuItem.onclick = function onclick() {
       updateMenu();
     };
+    displayNotification({options: {text: 'Hola Mundo'}});
   }
 
   /**
