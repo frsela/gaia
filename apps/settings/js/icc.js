@@ -5,11 +5,11 @@
 
 (function() {
   /**
-   * Constants. Set in config.json file
+   * Constants
    */
-  var displayTextTimeout;
-  var DEBUG;
-  var FAKE_EVENTS;
+  var displayTextTimeout = 10000;
+  var DEBUG = false;
+  var FAKE_EVENTS = false;
 
   /**
    * Debug method
@@ -36,23 +36,7 @@
   var stkLastSelectedTest = null;
   var icc;
 
-  /**
-   * Load configuration data or use default values
-   */
-  var req = utilities.config.load('/config.json');
-  req.onload = function(configData) {
-    DEBUG = configData.iccDebugEnabled;
-    displayTextTimeout = configData.iccDisplayTextTimeout;
-    FAKE_EVENTS = configData.iccFakeEvents;
-    init();
-  }
-  req.onerror = function(code) {
-    window.console.error('STK: Error while loading config file:', code);
-    DEBUG = false;
-    displayTextTimeout = 10000;
-    FAKE_EVENTS = false;
-    init();
-  }
+  init();
 
   /**
    * Init STK UI
