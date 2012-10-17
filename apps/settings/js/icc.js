@@ -263,32 +263,42 @@
     debug(' STK Communication changed - ' + evt.type);
     navigator.mozTelephony.calls.forEach(function callIterator(call) {
       debug( ' STK:CALLS State change: ' + call.state);
+      var outgoing = null;
       switch (call.state) {
         case 'incoming':
-          // TODO: Notify to the ICC
+          outgoing = false;
           break;
         case 'dialing':
-          // TODO: Notify to the ICC
+          outgoing = true;
           break;
       }
-      call.addEventListener('statechange',function callStateChange(){
+      call.addEventListener('error',function callError(err) {
+        // MozStkCallEvent
+        debug(' STK:CALL Error: ', err);
+        icc.sendStkEventDownload({
+          eventType: icc.STK_EVENT_TYPE_MT_CALL,
+          number: call.number,
+          error: err
+        });
+      });
+      call.addEventListener('statechange',function callStateChange() {
         debug(' STK:CALL State Change: ' + call.state);
         switch (call.state) {
           case 'connected':
-            // TODO: Notify to the ICC
+            // MozStkCallEvent
             icc.sendStkEventDownload({
               eventType: icc.STK_EVENT_TYPE_CALL_CONNECTED,
-              number: "",
-              isIssuedByRemote: true
+              number: call.number,
+              isIssuedByRemote: outgoing
             });
             break;
           case 'disconnected':
             call.removeEventListener('statechange', callStateChange);
             // MozStkCallEvent
             icc.sendStkEventDownload({
-              eventType: icc.STK_EVENT_TYPE_MT_CALL,
-              number: "",
-              error: null
+              eventType: icc.STK_EVENT_TYPE_CALL_DISCONNECTED,
+              number: call.number,
+              isIssuedByRemote: outgoing
             });
             // TODO: Notify to the ICC
             break;
