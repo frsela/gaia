@@ -229,6 +229,10 @@
       case icc.STK_EVENT_TYPE_MT_CALL:
       case icc.STK_EVENT_TYPE_CALL_CONNECTED:
       case icc.STK_EVENT_TYPE_CALL_DISCONNECTED:
+        debug(' STK: Registering to communications changes event');
+        var comm = navigator.mozTelephony;
+        comm.addEventListener('callschanged', handleCallsChangeEvent);
+        break;
       case icc.STK_EVENT_TYPE_LOCATION_STATUS:
       case icc.STK_EVENT_TYPE_USER_ACTIVITY:
       case icc.STK_EVENT_TYPE_IDLE_SCREEN_AVAILABLE:
@@ -247,6 +251,50 @@
         break;
       }
     }
+  }
+
+  /**
+   * Handle Events
+   */
+  function handleCallsChangeEvent(evt) {
+    if (evt.type != 'callschanged') {
+      return;
+    }
+    debug(' STK Communication changed - ' + evt.type);
+    navigator.mozTelephony.calls.forEach(function callIterator(call) {
+      debug( ' STK:CALLS State change: ' + call.state);
+      switch (call.state) {
+        case 'incoming':
+          // TODO: Notify to the ICC
+          break;
+        case 'dialing':
+          // TODO: Notify to the ICC
+          break;
+      }
+      call.addEventListener('statechange',function callStateChange(){
+        debug(' STK:CALL State Change: ' + call.state);
+        switch (call.state) {
+          case 'connected':
+            // TODO: Notify to the ICC
+            icc.sendStkEventDownload({
+              eventType: icc.STK_EVENT_TYPE_CALL_CONNECTED,
+              number: "",
+              isIssuedByRemote: true
+            });
+            break;
+          case 'disconnected':
+            call.removeEventListener('statechange', callStateChange);
+            // MozStkCallEvent
+            icc.sendStkEventDownload({
+              eventType: icc.STK_EVENT_TYPE_MT_CALL,
+              number: "",
+              error: null
+            });
+            // TODO: Notify to the ICC
+            break;
+        }
+      })
+    });
   }
 
   /**
