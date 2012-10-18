@@ -267,7 +267,7 @@
       if (call.state == 'incoming') {
         // MozStkCallEvent
         icc.sendStkEventDownload({
-          eventType: icc.STK_EVENT_TYPE_CALL_DISCONNECTED,
+          eventType: icc.STK_EVENT_TYPE_MT_CALL,
           number: call.number,
           isIssuedByRemote: outgoing,
           error: null
@@ -276,7 +276,7 @@
       call.addEventListener('error',function callError(err) {
         // MozStkCallEvent
         icc.sendStkEventDownload({
-          eventType: icc.STK_EVENT_TYPE_MT_CALL,
+          eventType: icc.STK_EVENT_TYPE_CALL_DISCONNECTED,
           number: call.number,
           error: err
         });
@@ -301,7 +301,6 @@
               isIssuedByRemote: outgoing,
               error: null
             });
-            // TODO: Notify to the ICC
             break;
         }
       })
