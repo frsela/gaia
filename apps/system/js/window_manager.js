@@ -54,19 +54,13 @@ var WindowManager = (function() {
   var homescreen = null;
   var homescreenURL = '';
   var homescreenManifestURL = '';
-
-  // Screenshot in sprite -- to use, or not to use,
-  // that's the question.
-  var useScreenshotInSprite = true;
-
   // keep the reference of inline activity frame here
   var inlineActivityFrame = null;
 
   // Some document elements we use
   var windows = document.getElementById('windows');
   var screenElement = document.getElementById('screen');
-  var banner = document.getElementById('system-banner');
-  var bannerContainer = banner.firstElementChild;
+  var wrapperFooter = document.querySelector('#wrapper');
 
   //
   // The set of running apps.
@@ -89,6 +83,21 @@ var WindowManager = (function() {
   // or null if there is none.
   function getDisplayedApp() {
     return displayedApp || null;
+  }
+
+  function requireFullscreen(origin) {
+    var app = runningApps[origin];
+    if (!app)
+      return false;
+
+    if (app.manifest.entry_points) {
+      var entryPoint = app.manifest.entry_points[origin.split('/')[3]];
+      if (entryPoint)
+          return entryPoint.fullscreen;
+      return false;
+    } else {
+      return app.manifest.fullscreen;
+    }
   }
 
   // Make the specified app the displayed app.
@@ -130,7 +139,7 @@ var WindowManager = (function() {
   // phone orientation is changed). And also when an app is launched
   // and each time an app is brought to the front, since the
   // orientation could have changed since it was last displayed
-  function setAppSize(origin) {
+  function setAppSize(origin, changeActivityFrame) {
     var app = runningApps[origin];
     if (!app)
       return;
@@ -146,15 +155,17 @@ var WindowManager = (function() {
     cssHeight += 'px';
 
     if (!screenElement.classList.contains('attention') &&
-        app.manifest.fullscreen) {
+        requireFullscreen(origin)) {
       cssHeight = window.innerHeight + 'px';
     }
 
     frame.style.width = cssWidth;
-
     frame.style.height = cssHeight;
 
-    setInlineActivityFrameSize();
+    // We will call setInlineActivityFrameSize()
+    // if changeActivityFrame is not explicitly set to false.
+    if (changeActivityFrame !== false)
+      setInlineActivityFrameSize();
   }
 
   // App's height is relevant to keyboard height
@@ -170,7 +181,7 @@ var WindowManager = (function() {
       window.innerHeight - StatusBar.height - keyboardHeight + 'px';
 
     if (!screenElement.classList.contains('attention') &&
-        app.manifest.fullscreen) {
+        requireFullscreen(displayedApp)) {
       cssHeight = window.innerHeight - keyboardHeight + 'px';
     }
 
@@ -192,134 +203,238 @@ var WindowManager = (function() {
     frame.style.height = appFrame.style.height;
   }
 
+  function setFrameBackgroundBlob(frame, blob, transparent) {
+    URL.revokeObjectURL(frame.dataset.bgObjectURL);
+    delete frame.dataset.bgObjectURL;
+
+    var objectURL = URL.createObjectURL(blob);
+    frame.dataset.bgObjectURL = objectURL;
+    var backgroundCSS =
+      '-moz-linear-gradient(top, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.5) 100%),' +
+      'url(' + objectURL + '),' +
+      ((transparent) ? 'transparent' : '#fff');
+
+    frame.style.background = backgroundCSS;
+  }
+
+  function clearFrameBackground(frame) {
+    if (!('bgObjectURL' in frame.dataset))
+      return;
+
+    URL.revokeObjectURL(frame.dataset.bgObjectURL);
+    delete frame.dataset.bgObjectURL;
+    frame.style.background = '';
+  }
+
   var openFrame = null;
   var closeFrame = null;
   var openCallback = null;
   var closeCallback = null;
 
-  // Create a window sprite element to perform windows open/close
-  // animations.
-  var sprite = document.createElement('div');
-  sprite.id = 'windowSprite';
-  sprite.dataset.zIndexLevel = 'window-sprite';
-  screenElement.appendChild(sprite);
-  sprite.appendChild(document.createElement('div'));
+  function setOpenFrame(frame) {
+    if (openFrame) {
+      removeFrameClasses(openFrame);
+    }
 
-  // This event handler is triggered when the transition ends.
-  // We're going to do two transitions, so it gets called twice.
-  sprite.addEventListener('transitionend', function spriteTransition(e) {
-    var prop = e.propertyName;
-    switch (sprite.className) {
-      case 'opening':
-        // transitionend will be called twice since we touched two properties.
-        // Only responsive to the property that takes the longest to transit
-        if (prop !== 'transform')
-          return;
+    openFrame = frame;
+  }
 
-        openFrame.classList.add('active');
-        windows.classList.add('active');
+  function setCloseFrame(frame) {
+    if (closeFrame) {
+      removeFrameClasses(closeFrame);
+    }
 
-        // If frame is still unpainted to this point, we will have to pause
-        // the transition and wait for the mozbrowserfirstpaint event.
-        if ('unpainted' in openFrame.dataset) {
-          openFrame.addEventListener(
-            'mozbrowserfirstpaint', function continueSpriteTransition() {
-              openFrame.removeEventListener(
-                'mozbrowserfirstpaint', continueSpriteTransition);
+    closeFrame = frame;
+  }
 
-              // Run getAppScreenshotFromFrame() to ensure all CSS backgrounds
-              // of the apps are loaded.
-              getAppScreenshotFromFrame(openFrame,
-                function screenshotTaken() {
-                  sprite.className = 'opened';
-                });
-            });
+  // Remove these visible className from frame so we will not ended
+  // up having a frozen frame in the middle of the transition
+  function removeFrameClasses(frame) {
+    var classNames = ['opening', 'closing', 'opening-switching',
+      'opening-card', 'closing-card'];
 
-          return;
-        }
+    var classList = frame.classList;
 
-        sprite.className = 'opened';
-        break;
+    classNames.forEach(function removeClass(className) {
+      classList.remove(className);
+    });
+  }
 
-      case 'opened':
-        // Take the focus away from the currently displayed app
-        var app = runningApps[displayedApp];
-        if (app && app.frame)
-          app.frame.blur();
+  windows.addEventListener('transitionend', function frameTransitionend(evt) {
+    var prop = evt.propertyName;
+    var frame = evt.target;
+    if (prop !== 'transform')
+      return;
 
-        // Give the focus to the frame
+    var classList = frame.classList;
+
+    if (classList.contains('inlineActivity')) {
+      if (classList.contains('active')) {
         openFrame.setVisible(true);
         openFrame.focus();
 
-        // Dispatch an 'appopen' event.
-        var evt = document.createEvent('CustomEvent');
-        evt.initCustomEvent('appopen', true, false, { origin: displayedApp });
-        openFrame.dispatchEvent(evt);
+        setOpenFrame(null);
+      } else {
+        windows.removeChild(frame);
+      }
 
-        setTimeout(openCallback);
+      return;
+    }
 
-        sprite.style.background = '';
-        sprite.className = '';
-        openFrame = null;
+    if (screenElement.classList.contains('switch-app')) {
+      if (classList.contains('closing')) {
+        classList.remove('closing');
+        classList.add('closing-card');
 
-        break;
-
-      case 'closing':
-        closeFrame.classList.remove('active');
-        windows.classList.remove('active');
-
-        screenElement.classList.remove('fullscreen-app');
-
-        sprite.className = 'closed';
-        break;
-
-      case 'closed':
-        // transitionend will be called twice since we touched two properties.
-        // Only responsive to the property that takes the longest to transit
-        if (prop !== 'transform')
-          return;
-
+        openFrame.classList.remove('opening-card');
+        openFrame.classList.add('opening-switching');
+      } else if (classList.contains('closing-card')) {
+        windowClosed(frame);
         setTimeout(closeCallback);
 
-        sprite.style.background = '';
-        sprite.className = '';
-        closeFrame = null;
-
-        break;
-
-      case 'inline-activity-opening':
-        openFrame.classList.add('active');
-        screenElement.classList.add('inline-activity');
-
-        // If frame is still unpainted to this point, we will have to pause
-        // the transition and wait for the mozbrowserfirstpaint event.
-        if ('unpainted' in openFrame.dataset) {
-          openFrame.addEventListener(
-            'mozbrowserfirstpaint', function continueSpriteTransition() {
-              openFrame.removeEventListener(
-                'mozbrowserfirstpaint', continueSpriteTransition);
-
-              sprite.className = 'inline-activity-opened';
-            });
-
-          return;
+      } else if (classList.contains('opening-switching')) {
+        // If the opening app need to be full screen, switch to full screen
+        if (classList.contains('fullscreen-app')) {
+          screenElement.classList.add('fullscreen-app');
         }
 
-        sprite.className = 'inline-activity-opened';
+        classList.remove('opening-switching');
 
-        break;
+        // XXX: without this setTimeout() there will be no opening transition.
+        // See https://bugzilla.mozilla.org/show_bug.cgi?id=780692#c111
+        setTimeout(function continueTransition() {
+          classList.add('opening');
+        });
+      } else if (classList.contains('opening')) {
+        windowOpened(frame);
+        setTimeout(openCallback);
 
-      case 'inline-activity-opened':
-        openFrame.setVisible(true);
-        openFrame.focus();
+        setCloseFrame(null);
+        setOpenFrame(null);
+        screenElement.classList.remove('switch-app');
+      }
 
-        sprite.style.background = '';
-        sprite.className = '';
-        openFrame = null;
+      return;
+    }
 
-        break;
+    if (classList.contains('opening')) {
+      windowOpened(frame);
+      setTimeout(openCallback);
+
+      setOpenFrame(null);
+    } else if (classList.contains('closing')) {
+      windowClosed(frame);
+      setTimeout(closeCallback);
+
+      setCloseFrame(null);
     }
   });
+
+  // Executes when the opening transition scale the app
+  // to full size.
+  function windowOpened(frame) {
+    frame.classList.add('active');
+    windows.classList.add('active');
+
+    if ('wrapper' in frame.dataset) {
+      wrapperFooter.classList.add('visible');
+    }
+
+    // Take the focus away from the currently displayed app
+    var app = runningApps[displayedApp];
+    if (app && app.frame)
+      app.frame.blur();
+
+    // Give the focus to the frame
+    frame.setVisible(true);
+    frame.focus();
+
+    // Set displayedApp to the new value
+    displayedApp = frame.dataset.frameOrigin;
+
+    // Dispatch an 'appopen' event.
+    var evt = document.createEvent('CustomEvent');
+    evt.initCustomEvent('appopen', true, false, { origin: displayedApp });
+    frame.dispatchEvent(evt);
+  }
+
+  // Executes when app closing transition finishes.
+  function windowClosed(frame) {
+    frame.classList.remove('active');
+    windows.classList.remove('active');
+
+    screenElement.classList.remove('fullscreen-app');
+
+    if ('wrapper' in frame.dataset) {
+      wrapperFooter.classList.remove('visible');
+    }
+
+    // Set displayedApp state to homescreen
+    displayedApp = homescreen;
+  }
+
+  // The following things needs to happen when firstpaint happens.
+  // We centralize all that here but not all of them applies.
+  windows.addEventListener('mozbrowserfirstpaint', function firstpaint(evt) {
+    var frame = evt.target;
+
+    // remove the unpainted flag
+    delete frame.dataset.unpainted;
+
+    setTimeout(function firstpainted() {
+      // Save the screenshot
+      // Remove the background only until we actually got the screenshot,
+      // because the getScreenshot() call will be pushed back by
+      // painting/loading in the child process; when we got the screenshot,
+      // that means the app is mostly loaded.
+      // (as opposed to plain white firstpaint)
+      saveAppScreenshot(frame, function screenshotTaken() {
+        // Remove the default background
+        frame.classList.remove('default-background');
+
+        // Remove the screenshot from frame
+        clearFrameBackground(frame);
+      });
+    });
+  });
+
+  // setFrameBackground() will attach the screenshot background to
+  // the given frame.
+  // The callback could be sync or async (depend on whether we need
+  // the screenshot from database or not)
+  function setFrameBackground(frame, callback, transparent) {
+    // If the frame is painted, or there is already background image present
+    // start the transition right away.
+    if (!('unpainted' in frame.dataset) ||
+        ('bgObjectURL' in frame.dataset)) {
+      callback();
+      return;
+    }
+
+    // Get the screenshot from the database
+    getAppScreenshotFromDatabase(frame.src, function(screenshot) {
+      // If firstpaint is faster than database, we will not transition
+      // with screenshot.
+      if (!('unpainted' in frame.dataset)) {
+        callback();
+        return;
+      }
+
+      if (!screenshot) {
+        // put a default background
+        openFrame.classList.add('default-background');
+        callback();
+        return;
+      }
+
+      // set the screenshot as the background of the frame itself.
+      // we are safe to do so since there is nothing on it yet.
+      setFrameBackgroundBlob(openFrame, screenshot, transparent);
+
+      // start the transition
+      callback();
+    });
+  }
 
   // On-disk database for window manager.
   // It's only for app screenshots right now.
@@ -413,10 +528,8 @@ var WindowManager = (function() {
 
     var req = frame.getScreenshot(frame.offsetWidth, frame.offsetHeight);
 
-    // This serve as a workaround of
+    // This serves as a workaround for
     // https://bugzilla.mozilla.org/show_bug.cgi?id=787519
-    // We also use this timeout to make sure transition
-    // won't stuck for too long.
     var isTimeout = false;
     var timer = setTimeout(function getScreenshotTimeout() {
       console.warn('Window Manager: getScreenshot timeout.');
@@ -484,62 +597,55 @@ var WindowManager = (function() {
     });
   }
 
-  function afterPaint(callback) {
-    window.addEventListener('MozAfterPaint', function afterPainted() {
-      window.removeEventListener('MozAfterPaint', afterPainted);
-      setTimeout(callback);
-    });
-  }
-
   // Perform an "open" animation for the app's iframe
   function openWindow(origin, callback) {
     var app = runningApps[origin];
-    openFrame = app.frame;
+    setOpenFrame(app.frame);
 
     openCallback = callback || function() {};
 
+    // Dispatch a appwillopen event
+    var evt = document.createEvent('CustomEvent');
+    evt.initCustomEvent('appwillopen', true, false, { origin: origin });
+    app.frame.dispatchEvent(evt);
+
     if (origin === homescreen) {
+      // We cannot apply background screenshot to home screen app since
+      // the screenshot is encoded in JPEG and the alpha channel is
+      // not perserved. See
+      // https://bugzilla.mozilla.org/show_bug.cgi?id=801676#c33
+      // If that resolves,
+      //   setFrameBackground(openFrame, gotBackground, true);
+      // will simply work here.
+
       openCallback();
       windows.classList.add('active');
       openFrame.classList.add('homescreen');
       openFrame.setVisible(true);
       openFrame.focus();
-      openFrame = null;
-    } else {
-      if (app.manifest.fullscreen)
-        screenElement.classList.add('fullscreen-app');
+      setOpenFrame(null);
+      displayedApp = origin;
 
-      // Get the screenshot of the app and put it on the sprite
-      // before starting the transition
-      sprite.className = 'before-open';
-      getAppScreenshot(openFrame, function(screenshot, isCached) {
-        sprite.dataset.mask = isCached;
-
-        if (!screenshot || !useScreenshotInSprite) {
-          sprite.dataset.mask = false;
-          sprite.className = 'opening';
-          return;
-        }
-
-        sprite.style.background = '#fff url(' + screenshot + ')';
-        // Make sure Gecko paint the sprite first
-        afterPaint(function() {
-          // Start the transition
-          sprite.className = 'opening';
-        });
-      });
+      return;
     }
 
-    // Dispatch a appwillopen event
-    var evt = document.createEvent('CustomEvent');
-    evt.initCustomEvent('appwillopen', true, false, { origin: displayedApp });
-    app.frame.dispatchEvent(evt);
+    if (requireFullscreen(origin))
+      screenElement.classList.add('fullscreen-app');
+
+    setFrameBackground(openFrame, function gotBackground() {
+      // Start the transition when this async/sync callback is called.
+      if (!screenElement.classList.contains('switch-app')) {
+        openFrame.classList.add('opening');
+      } else {
+        openFrame.classList.add('opening-card');
+      }
+    });
   }
 
   // Perform a "close" animation for the app's iframe
   function closeWindow(origin, callback) {
     var app = runningApps[origin];
-    closeFrame = app.frame;
+    setCloseFrame(app.frame);
     closeCallback = callback || function() {};
 
     // Send a synthentic 'appwillclose' event.
@@ -553,99 +659,36 @@ var WindowManager = (function() {
     closeFrame.blur();
     closeFrame.setVisible(false);
 
-    // Get the screenshot of the app and put it on the sprite
-    // before starting the transition
-    sprite.className = 'before-close';
-    getAppScreenshot(closeFrame, function(screenshot, isCached) {
-      sprite.dataset.mask = isCached;
-
-      if (!screenshot || !useScreenshotInSprite) {
-        sprite.dataset.mask = false;
-        sprite.className = 'closing';
-        return;
-      }
-
-      sprite.style.background = '#fff url(' + screenshot + ')';
-      // Make sure Gecko paint the sprite first
-      afterPaint(function() {
-        // Start the transition
-        sprite.className = 'closing';
-      });
-    });
+    // Start the transition
+    closeFrame.classList.add('closing');
+    closeFrame.classList.remove('active');
   }
 
   // Perform a "switching" animation for the closing frame and the opening frame
-  function switchWindow(origin, newOrigin, callback) {
+  function switchWindow(origin, callback) {
+    // This will trigger different transition to both openWindow()
+    // and closeWindow() transition.
     screenElement.classList.add('switch-app');
 
-    function createSprite() {
-      var el = document.createElement('div');
-      el.className = 'windowSprite';
-      el.dataset.zIndexLevel = 'window-sprite';
-      el.appendChild(document.createElement('div'));
-      screenElement.insertBefore(el, sprite);
-      return el;
-    }
+    // Ask closeWindow() to start closing the displayedApp
+    closeWindow(displayedApp, callback);
 
-    // First, create two cards for switching animation
-    var closingAppSprite = createSprite();
-    var openingAppSprite = createSprite();
+    // If the switchWindow() transition is interrupted,
+    // this ensure the state being set to homescreen.
+    displayedApp = homescreen;
 
-    openingAppSprite.classList.add('right');
-
-    var closingAppFrame = runningApps[origin].frame;
-    var openingAppFrame = runningApps[newOrigin].frame;
-
-    // Fill the opening app sprite with screenshot.
-    getAppScreenshot(openingAppFrame,
-      function gotScreenshot(screenshot, isCached) {
-        if (!screenshot || !useScreenshotInSprite) {
-          openingAppSprite.dataset.mask = false;
-        } else {
-          openingAppSprite.dataset.mask = isCached;
-          openingAppSprite.style.background = '#fff url(' + screenshot + ')';
-        }
-      }
-    );
-
-    // Fill the closing app sprite with screenshot.
-    // when the closing one got filled we start the animation
-    getAppScreenshot(closingAppFrame,
-      function gotScreenshot(screenshot, isCached) {
-        if (!screenshot || !useScreenshotInSprite) {
-          closingAppSprite.dataset.mask = false;
-        } else {
-          closingAppSprite.dataset.mask = isCached;
-          closingAppSprite.style.background = '#fff url(' + screenshot + ')';
-        }
-
-        // Start the animation
-        closeWindow(origin, function windowClosed() {
-          // Start the switching animation
-          closingAppSprite.classList.add('left');
-          openingAppSprite.classList.remove('right');
-
-          // Wait for the switching animation to finish
-          openingAppSprite.addEventListener('transitionend',
-            function switched() {
-              openingAppSprite.removeEventListener('transitionend', switched);
-              screenElement.removeChild(closingAppSprite);
-              screenElement.removeChild(openingAppSprite);
-
-              // Show the new app
-              openWindow(newOrigin, function opened() {
-                screenElement.classList.remove('switch-app');
-                if (callback)
-                  callback();
-              });
-            });
-        });
-      });
+    // Ask openWindow() to show a card on the right waiting to be opened
+    openWindow(origin);
   }
 
   // Ensure the homescreen is loaded and return its frame.  Restarts
   // the homescreen app if it was killed in the background.
-  function ensureHomescreen() {
+  function ensureHomescreen(reset) {
+    // If the url of the homescreen is not known at this point do nothing.
+    if (!homescreen || !homescreenManifestURL) {
+      return null;
+    }
+
     if (!isRunning(homescreen)) {
       var app = Applications.getByManifestURL(homescreenManifestURL);
       appendFrame(null, homescreen, homescreenURL,
@@ -653,20 +696,85 @@ var WindowManager = (function() {
       setAppSize(homescreen);
       openWindow(homescreen, null);
       addWrapperListener();
+
+    } else if (reset) {
+      runningApps[homescreen].frame.src = homescreenURL;
+    }
+
+    // Make sure the homescreen is considered as the current displayed
+    // app if there is none.
+    if (!displayedApp) {
+      displayedApp = homescreen;
     }
     return runningApps[homescreen].frame;
+  }
+
+  function retrieveHomescreen(callback) {
+    var lock = navigator.mozSettings.createLock();
+    var setting = lock.get('homescreen.manifestURL');
+    setting.onsuccess = function() {
+      var app =
+        Applications.getByManifestURL(this.result['homescreen.manifestURL']);
+
+      // XXX This is a one-day workaround to not break everybody and make sure
+      // work can continue.
+      if (!app) {
+        var tmpURL = document.location.toString()
+                                      .replace('system', 'homescreen')
+                                      .replace('index.html', 'manifest.webapp');
+        app = Applications.getByManifestURL(tmpURL);
+      }
+
+      if (app) {
+        homescreenManifestURL = app.manifestURL;
+        homescreen = app.origin;
+        homescreenURL = app.origin + '/index.html#root';
+
+        callback(app);
+      }
+    }
+  }
+
+  // Hide current app
+  function hideCurrentApp(callback) {
+    if (displayedApp == null || displayedApp == homescreen)
+      return;
+    var frame = getAppFrame(displayedApp);
+    frame.classList.add('hideBottom');
+    frame.classList.remove('restored');
+    if (callback) {
+      frame.addEventListener('transitionend', function execCallback() {
+        frame.removeEventListener('transitionend', execCallback);
+        callback();
+      });
+    }
+  }
+
+  function restoreCurrentApp() {
+    var frame = getAppFrame(displayedApp);
+    frame.classList.remove('hideBottom');
+    frame.classList.add('restored');
+    frame.addEventListener('transitionend', function removeRestored() {
+      frame.removeEventListener('transitionend', removeRestored);
+      frame.classList.remove('restored');
+    });
   }
 
   // Switch to a different app
   function setDisplayedApp(origin, callback) {
     var currentApp = displayedApp, newApp = origin || homescreen;
-
     // Returns the frame reference of the home screen app.
     // Restarts the homescreen app if it was killed in the background.
     var homescreenFrame = ensureHomescreen();
-
     // Discard any existing activity
     stopInlineActivity();
+
+    // Before starting a new transition, let's make sure current transitions
+    // are stopped and the state classes are cleaned up.
+    setOpenFrame(null);
+    setCloseFrame(null);
+    screenElement.classList.remove('switch-app');
+    screenElement.classList.remove('fullscreen-app');
 
     // Case 1: the app is already displayed
     if (currentApp && currentApp == newApp) {
@@ -674,11 +782,20 @@ var WindowManager = (function() {
       if (callback)
         callback();
     }
-    // Case 2: null->homescreen || homescreen->app
+    // Case 2: null --> app
+    else if (!currentApp && newApp != homescreen) {
+      homescreenFrame.setVisible(false);
+      setAppSize(newApp);
+      openWindow(newApp, function windowOpened() {
+        // TODO Implement FTU stuff if necessary
+      });
+    }
+    // Case 3: null->homescreen || homescreen->app
     else if ((!currentApp && newApp == homescreen) ||
              (currentApp == homescreen && newApp)) {
-      if (!currentApp)
+      if (!currentApp) {
         homescreenFrame.setVisible(true);
+      }
       setAppSize(newApp);
 
       openWindow(newApp, function windowOpened() {
@@ -692,7 +809,7 @@ var WindowManager = (function() {
           callback();
       });
     }
-    // Case 3: app->homescreen
+    // Case 4: app->homescreen
     else if (currentApp && currentApp != homescreen && newApp == homescreen) {
       // Animate the window close.  Ensure the homescreen is in the
       // foreground since it will be shown during the animation.
@@ -704,12 +821,11 @@ var WindowManager = (function() {
       setAppSize(newApp);
       closeWindow(currentApp, callback);
     }
-    // Case 4: app-to-app transition
+    // Case 5: app-to-app transition
     else {
       setAppSize(newApp);
-      switchWindow(currentApp, newApp, callback);
+      switchWindow(newApp, callback);
     }
-
     // Set homescreen as active,
     // to control the z-index between homescreen & keyboard iframe
     if ((newApp == homescreen) && homescreenFrame) {
@@ -727,9 +843,6 @@ var WindowManager = (function() {
     // for making screenshots.
     if (newApp)
       runningApps[newApp].launchTime = Date.now();
-
-    // Set displayedApp to the new value
-    displayedApp = newApp;
 
     // If the app has a attention screen open, displaying it
     AttentionScreen.showForOrigin(newApp);
@@ -768,6 +881,9 @@ var WindowManager = (function() {
     frame.className = 'appWindow';
     frame.dataset.frameOrigin = origin;
 
+    // frames are began unpainted.
+    frame.dataset.unpainted = true;
+
     // Note that we don't set the frame size here.  That will happen
     // when we display the app in setDisplayedApp()
 
@@ -788,14 +904,6 @@ var WindowManager = (function() {
       'Browser',
       // Requires nested content processes (bug 761935).  This is not
       // on the schedule for v1.
-
-      'Cost Control',
-      // Cross-process SMS (bug 775997)
-
-      // /!\ Also remove it from outOfProcessBlackList of background_service.js
-      // Once this app goes OOP. (can be done by reverting a commit)
-      'Messages'
-      // Crashes when launched OOP (bug 775997)
     ];
 
     if (!isOutOfProcessDisabled &&
@@ -819,21 +927,6 @@ var WindowManager = (function() {
     frame.id = 'appframe' + nextAppId++;
     frame.dataset.frameType = 'window';
 
-    // frames are began unpainted. This dataset value will pause the
-    // opening sprite transition so users will not see whitish screen.
-    frame.dataset.unpainted = true;
-    frame.addEventListener('mozbrowserfirstpaint', function painted() {
-      frame.removeEventListener('mozbrowserfirstpaint', painted);
-      delete frame.dataset.unpainted;
-
-      // Save the screenshot when we got mozbrowserfirstpaint event,
-      // regardless of the sprite transition state.
-      // setTimeout() here ensures that we get the screenshot with content.
-      setTimeout(function() {
-        saveAppScreenshot(frame);
-      });
-    });
-
     // Add the iframe to the document
     windows.appendChild(frame);
 
@@ -845,6 +938,10 @@ var WindowManager = (function() {
       launchTime: 0
     };
 
+    if (requireFullscreen(origin)) {
+      frame.classList.add('fullscreen-app');
+    }
+
     numRunningApps++;
   }
 
@@ -853,21 +950,6 @@ var WindowManager = (function() {
     var frame = createFrame(null, origin, url, name, manifest, manifestURL);
     frame.classList.add('inlineActivity');
     frame.dataset.frameType = 'inline-activity';
-
-    // frames are began unpainted. This dataset value will pause the
-    // opening sprite transition so users will not see whitish screen.
-    frame.dataset.unpainted = true;
-    frame.addEventListener('mozbrowserfirstpaint', function painted() {
-      frame.removeEventListener('mozbrowserfirstpaint', painted);
-      delete frame.dataset.unpainted;
-
-      // Save the screenshot when we got mozbrowserfirstpaint event,
-      // regardless of the sprite transition state.
-      // setTimeout() here ensures that we get the screenshot with content.
-      setTimeout(function() {
-        saveAppScreenshot(inlineActivityFrame);
-      });
-    });
 
     // Discard any existing activity
     stopInlineActivity();
@@ -884,24 +966,9 @@ var WindowManager = (function() {
     // Open the frame, first, store the reference
     openFrame = frame;
 
-    // Get the screenshot of the app and put it on the sprite
-    // before starting the transition
-    sprite.className = 'before-inline-activity';
-    getAppScreenshot(inlineActivityFrame, function(screenshot, isCached) {
-      sprite.dataset.mask = isCached;
-
-      if (!screenshot || !useScreenshotInSprite) {
-        sprite.dataset.mask = false;
-        sprite.className = 'inline-activity-opening';
-        return;
-      }
-
-      sprite.style.background = '#fff url(' + screenshot + ')';
-      // Make sure Gecko paint the sprite first
-      afterPaint(function() {
-        // Start the transition
-        sprite.className = 'inline-activity-opening';
-      });
+    setFrameBackground(openFrame, function gotBackground() {
+      // Start the transition when this async/sync callback is called.
+      openFrame.classList.add('active');
     });
   }
 
@@ -909,19 +976,17 @@ var WindowManager = (function() {
     var app = runningApps[origin];
     var frame = app.frame;
 
-    if (frame)
+    if (frame) {
       windows.removeChild(frame);
+      clearFrameBackground(frame);
+    }
 
     if (openFrame == frame) {
-      sprite.style.background = '';
-      sprite.className = '';
-      openFrame = null;
+      setOpenFrame(null);
       setTimeout(openCallback);
     }
     if (closeFrame == frame) {
-      sprite.style.background = '';
-      sprite.className = '';
-      closeFrame = null;
+      setCloseFrame(null);
       setTimeout(closeCallback);
     }
 
@@ -937,9 +1002,9 @@ var WindowManager = (function() {
     var frame = inlineActivityFrame;
     inlineActivityFrame = null;
 
-    // If frame is transitioning we should cancel the transition.
+    // If frame is transitioning we should remove the reference
     if (openFrame == frame)
-      sprite.className = '';
+      setOpenFrame(null);
 
     // If frame is never set visible, we can remove the frame directly
     // without closing transition
@@ -961,12 +1026,6 @@ var WindowManager = (function() {
     // Remove the active class and start the closing transition
     frame.classList.remove('active');
     screenElement.classList.remove('inline-activity');
-
-    // When closing transition ends, remove the frame
-    frame.addEventListener('transitionend', function frameTransitionend() {
-      frame.removeEventListener('transitionend', frameTransitionend);
-      windows.removeChild(frame);
-    });
   }
 
   // There are two types of mozChromeEvent we need to handle
@@ -1007,24 +1066,32 @@ var WindowManager = (function() {
         }
       }
     }
-
     switch (e.detail.type) {
       // mozApps API is asking us to launch the app
       // We will launch it in foreground
       case 'webapps-launch':
-        if (!isRunning(origin)) {
-          appendFrame(null, origin, e.detail.url,
-                      name, app.manifest, app.manifestURL);
+        if (origin == homescreen) {
+          // No need to append a frame if is homescreen
+          setDisplayedApp();
+        } else {
+          if (!isRunning(origin)) {
+            appendFrame(null, origin, e.detail.url,
+                        name, app.manifest, app.manifestURL);
+          }
+          setDisplayedApp(origin, null, 'window');
         }
-
-        setDisplayedApp(origin, null, 'window');
         break;
-
       // System Message Handler API is asking us to open the specific URL
       // that handles the pending system message.
       // We will launch it in background if it's not handling an activity.
       case 'open-app':
-        if (e.detail.isActivity && e.detail.target.disposition == 'inline') {
+        // If the system message goes to System app,
+        // we should not be launching that in a frame.
+        if (e.detail.url === window.location.href)
+          return;
+
+        if (e.detail.isActivity && e.detail.target.disposition &&
+            e.detail.target.disposition == 'inline') {
           // Inline activities behaves more like a dialog,
           // let's deal them here.
 
@@ -1059,18 +1126,10 @@ var WindowManager = (function() {
         }
 
         // We will only bring web activity handling apps to the foreground
-        if (!e.detail.isActivity)
-          return;
-
-        // If nothing is opened yet, consider the first application opened
-        // as the homescreen.
-        if (!homescreen) {
-          homescreen = origin;
-          addWrapperListener();
-          // Save the entry manifest URL and launch URL so that we can restart
-          // the homescreen later, if necessary.
-          homescreenURL = e.detail.url;
-          homescreenManifestURL = manifestURL;
+        if (!e.detail.isActivity) {
+          // set the size of the iframe
+          // so Cards View will get a correct screenshot of the frame
+          setAppSize(origin, false);
           return;
         }
 
@@ -1117,17 +1176,9 @@ var WindowManager = (function() {
     deleteAppScreenshotFromDatabase(e.detail.application.origin);
   });
 
-  function showCrashBanner(manifestURL) {
+  function handleAppCrash(manifestURL) {
     var app = Applications.getByManifestURL(manifestURL);
-    var _ = navigator.mozL10n.get;
-    banner.addEventListener('animationend', function animationend() {
-      banner.removeEventListener('animationend', animationend);
-      banner.classList.remove('visible');
-    });
-    banner.classList.add('visible');
-
-    bannerContainer.textContent = _('foreground-app-crash-notification',
-      { name: app.manifest.name });
+    CrashReporter.setAppName(app.manifest.name);
   }
 
   // Deal with crashed apps
@@ -1140,7 +1191,7 @@ var WindowManager = (function() {
 
     if (e.target.dataset.frameType == 'inline-activity') {
       stopInlineActivity();
-      showCrashBanner(manifestURL);
+      handleAppCrash(manifestURL);
       return;
     }
 
@@ -1157,7 +1208,7 @@ var WindowManager = (function() {
     // If the crashing app is currently displayed, we will present
     // the user with a banner notification.
     if (displayedApp == origin)
-      showCrashBanner(manifestURL);
+      handleAppCrash(manifestURL);
 
     // If the crashing app is the home screen app and it is the displaying app
     // we will need to relaunch it right away.
@@ -1260,7 +1311,8 @@ var WindowManager = (function() {
   // When a resize event occurs, resize the running app, if there is one
   // When the status bar is active it doubles in height so we need a resize
   var appResizeEvents = ['resize', 'status-active', 'status-inactive',
-  'keyboardchange', 'keyboardhide', 'attentionscreenhide'];
+                         'keyboardchange', 'keyboardhide',
+                         'attentionscreenhide'];
   appResizeEvents.forEach(function eventIterator(event) {
     window.addEventListener(event, function on(evt) {
       if (event == 'keyboardchange') {
@@ -1282,19 +1334,18 @@ var WindowManager = (function() {
     // Note that for this to work, the lockscreen and other overlays must
     // be included in index.html before this one, so they can register their
     // event handlers before we do.
+
+    // openFrame check in the second |else if| for the current transition
+    // -- if there one, is the user would like to cancel it instead of
+    // toggling homescreen panels.
     if (document.mozFullScreen) {
       document.mozCancelFullScreen();
     } else if (inlineActivityFrame) {
       stopInlineActivity();
-    } else if (displayedApp !== homescreen) {
+    } else if (displayedApp !== homescreen || openFrame) {
       setDisplayedApp(homescreen);
     } else {
-      new MozActivity({
-        name: 'view',
-        data: {
-          type: 'application/x-application-list'
-        }
-      });
+      ensureHomescreen(true);
     }
   });
 
@@ -1343,6 +1394,13 @@ var WindowManager = (function() {
     getAppFrame: getAppFrame,
     getRunningApps: function() {
       return runningApps;
-    }
+    },
+    setDisplayedApp: setDisplayedApp,
+    getCurrentDisplayedApp: function() {
+      return runningApps[displayedApp];
+    },
+    hideCurrentApp: hideCurrentApp,
+    restoreCurrentApp: restoreCurrentApp,
+    retrieveHomescreen: retrieveHomescreen
   };
 }());

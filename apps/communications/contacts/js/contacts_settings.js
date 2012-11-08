@@ -22,6 +22,8 @@ contacts.Settings = (function() {
     initContainers();
 
     getData();
+
+    checkOnline();
   };
 
   // Get the different values that we will show in the app
@@ -211,6 +213,15 @@ contacts.Settings = (function() {
         logoutReq.onsuccess = function() {
           Contacts.hideOverlay();
           checkFbImported(false);
+          // And it is needed to clear any previously set alarm
+          window.asyncStorage.getItem(fb.utils.ALARM_ID_KEY, function(data) {
+            if (data) {
+              navigator.mozAlarms.remove(data.id);
+              window.asyncStorage.removeItem(fb.utils.ALARM_ID_KEY);
+              window.asyncStorage.removeItem(fb.utils.LAST_UPDATE_KEY);
+              window.asyncStorage.removeItem(fb.utils.CACHE_FRIENDS_KEY);
+            }
+          });
         }
 
         logoutReq.onerror = function(e) {
@@ -271,12 +282,35 @@ contacts.Settings = (function() {
 
     // Clean possible messages
     cleanMessage();
-
     Contacts.goBack();
   };
 
+  var checkOnline = function() {
+    var disableElement = document.querySelector('#fbTotalsResult');
+    if (navigator.onLine === true) {
+      fbImportLink.parentNode.removeAttribute('aria-disabled');
+      if (disableElement) {
+        disableElement.removeAttribute('aria-disabled');
+      }
+    }
+    else {
+      fbImportLink.parentNode.setAttribute('aria-disabled', 'true');
+      if (disableElement) {
+        disableElement.setAttribute('aria-disabled', 'true');
+      }
+    }
+  }
+
+  var refresh = function refresh() {
+    if (document.getElementById('fbTotalsResult')) {
+      fbGetTotals();
+    }
+  }
+
   return {
     'init': init,
-    'close': close
+    'close': close,
+    'refresh': refresh,
+    'onLineChanged': checkOnline
   };
 })();
