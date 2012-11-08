@@ -453,17 +453,33 @@
     var selectedPhoneSound;
     switch (options.tone) {
       case icc.STK_TONE_TYPE_DIAL_TONE:
+        selectedPhoneSound = 'tones/350Hz+440Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_CALLED_SUBSCRIBER_BUSY:
+        selectedPhoneSound = 'tones/480Hz+620Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_CONGESTION:
+        selectedPhoneSound = 'tones/425Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_RADIO_PATH_ACK:
       case icc.STK_TONE_TYPE_RADIO_PATH_NOT_AVAILABLE:
+        selectedPhoneSound = 'tones/425Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_ERROR:
+        selectedPhoneSound = 'tones/950Hz+1400Hz+1800Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_CALL_WAITING_TONE:
       case icc.STK_TONE_TYPE_RINGING_TONE:
+        selectedPhoneSound = 'tones/425Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_GENERAL_BEEP:
+        selectedPhoneSound = 'tones/400Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_POSITIVE_ACK_TONE:
+        selectedPhoneSound = 'tones/425Hz_200ms_16bit_48kHz_-1dBFS_mono.ogg';
+        break;
       case icc.STK_TONE_TYPE_NEGATIVE_ACK_TONE:
-        selectedPhoneSound = 'style/ringtones/classic.ogg';
+        selectedPhoneSound = 'tones/300Hz+400Hz+500Hz_400ms_16bit_48kHz_-1dBFS_mono.ogg';
         break;
     }
     tonePlayer.src = selectedPhoneSound;
