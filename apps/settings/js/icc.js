@@ -507,7 +507,11 @@
     }
 
     if (options.text) {
-      alert(options.text);
+      alertbox_btn.onclick = function() {
+        alertbox.classList.add('hidden');
+      };
+      alertbox_msg.textContent = options.text;
+      alertbox.classList.remove('hidden');
     }
   }
 
