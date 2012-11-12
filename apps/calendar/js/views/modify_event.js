@@ -11,6 +11,7 @@ Calendar.ns('Views').ModifyEvent = (function() {
 
     this.save = this.save.bind(this);
     this.deleteRecord = this.deleteRecord.bind(this);
+    this.cancel = this.cancel.bind(this);
     this._toggleAllDay = this._toggleAllDay.bind(this);
 
     this._initEvents();
@@ -27,11 +28,16 @@ Calendar.ns('Views').ModifyEvent = (function() {
 
     DEFAULT_VIEW: '/month/',
 
+    ERROR_PREFIX: 'event-error-',
+
     selectors: {
       element: '#modify-event-view',
       form: '#modify-event-view form',
+      status: '#modify-event-view section[role="status"]',
+      errors: '#modify-event-view .errors',
       saveButton: '#modify-event-view .save',
-      deleteButton: '#modify-event-view .delete-record'
+      deleteButton: '#modify-event-view .delete-record',
+      cancelButton: '#modify-event-view .cancel'
     },
 
     _initEvents: function() {
@@ -43,6 +49,7 @@ Calendar.ns('Views').ModifyEvent = (function() {
 
       this.saveButton.addEventListener('click', this.save);
       this.deleteButton.addEventListener('click', this.deleteRecord);
+      this.cancelButton.addEventListener('click', this.cancel);
       this.form.addEventListener('submit', this.save);
 
       var allday = this.getField('allday');
@@ -181,12 +188,16 @@ Calendar.ns('Views').ModifyEvent = (function() {
       return this._findElement('form');
     },
 
+    get saveButton() {
+      return this._findElement('saveButton');
+    },
+
     get deleteButton() {
       return this._findElement('deleteButton');
     },
 
-    get saveButton() {
-      return this._findElement('saveButton');
+    get cancelButton() {
+      return this._findElement('cancelButton');
     },
 
     /**
@@ -239,6 +250,12 @@ Calendar.ns('Views').ModifyEvent = (function() {
         this.event[field] = data[field];
       }
 
+      var errors = this.event.validationErrors();
+      if (errors) {
+        this.showErrors(errors);
+        return;
+      }
+
       // can't create without a calendar id
       // because of defaults this should be impossible.
       if (!data.calendarId)
@@ -269,7 +286,6 @@ Calendar.ns('Views').ModifyEvent = (function() {
           // order is important the above method triggers the building
           // of the dom elements so selectedDay must come after.
           self.app.timeController.selectedDay = moveDate;
-
           self.app.go(redirect);
         });
       }
@@ -299,12 +315,23 @@ Calendar.ns('Views').ModifyEvent = (function() {
     /**
      * Persist current model.
      */
-    save: function() {
+    save: function(event) {
+      if (event) {
+        event.preventDefault();
+      }
+
       if (this.provider) {
         this._persistEvent('updateEvent', 'canUpdate');
       } else {
         this._persistEvent('createEvent', 'canCreate');
       }
+    },
+
+    /**
+     * Dismiss modification and go back to previous screen.
+     */
+    cancel: function() {
+      window.back();
     },
 
     /**
@@ -399,17 +426,18 @@ Calendar.ns('Views').ModifyEvent = (function() {
 
       this.getField('location').value = model.location;
 
+      var dateSrc = model;
+      if (model.remote.isRecurring && this.busytime) {
+          dateSrc = this.busytime;
+      }
       this.getField('startDate').value =
-        InputParser.exportDate(model.startDate);
-
+        InputParser.exportDate(dateSrc.startDate);
       this.getField('endDate').value =
-        InputParser.exportDate(model.endDate);
-
+        InputParser.exportDate(dateSrc.endDate);
       this.getField('startTime').value =
-        InputParser.exportTime(model.startDate);
-
+        InputParser.exportTime(dateSrc.startDate);
       this.getField('endTime').value =
-          InputParser.exportTime(model.endDate);
+        InputParser.exportTime(dateSrc.endDate);
 
       this.getField('description').textContent =
         model.description;

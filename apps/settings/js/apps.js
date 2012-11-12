@@ -22,7 +22,7 @@ var ApplicationsList = {
   ],
 
   container: document.querySelector('#appPermissions > ul'),
-  detailTitle: document.querySelector('#appPermissionsDetails > header > h1'),
+  detailTitle: document.querySelector('#appPermissions-details > header > h1'),
   developerName: document.querySelector('#developer-infos > a'),
   developerLink: document.querySelector('#developer-infos > small > a'),
   detailPermissionsList: document.querySelector('#permissionsListHeader + ul'),
@@ -45,7 +45,7 @@ var ApplicationsList = {
     navigator.mozApps.mgmt.getAll().onsuccess = function mozAppGotAll(evt) {
       var apps = evt.target.result;
       apps.forEach(function(app) {
-        if (!self._isManageable(app))
+        if (!app.removable)
           return;
 
         self._apps.push(app);
@@ -76,7 +76,7 @@ var ApplicationsList = {
       }
 
       var item = document.createElement('li');
-      item.innerHTML = '<a href="#appPermissionsDetails">' +
+      item.innerHTML = '<a href="#appPermissions-details">' +
                        icon + app.manifest.name + '</a>';
       item.onclick = this.showAppDetails.bind(this, app);
       this.container.appendChild(item);
@@ -85,7 +85,7 @@ var ApplicationsList = {
 
   oninstall: function al_oninstall(evt) {
     var app = evt.application;
-    if (!this._isManageable(app))
+    if (!app.removable)
       return;
 
     this._apps.push(app);
@@ -106,7 +106,7 @@ var ApplicationsList = {
       return false;
     });
 
-    if (!app || !this._isManageable(app))
+    if (!app || !app.removable)
       return;
 
     window.location.hash = '#appPermissions';
@@ -122,7 +122,9 @@ var ApplicationsList = {
     var manifest = app.manifest;
     this.detailTitle.textContent = manifest.name;
     this.developerName.textContent = manifest.developer.name;
+    this.developerName.dataset.href = manifest.developer.url;
     this.developerLink.href = manifest.developer.url;
+    this.developerLink.dataset.href = manifest.developer.url;
     this.developerLink.textContent = manifest.developer.url;
 
     this.detailPermissionsList.innerHTML = '';
@@ -202,10 +204,6 @@ var ApplicationsList = {
     }
   },
 
-  _isManageable: function al_isManageable(app) {
-    return (app.removable && app.manifest.launch_path !== undefined);
-  },
-
   _changePermission: function al_removePermission(app, perm, value) {
     var mozPerms = navigator.mozPermissionSettings;
     if (!mozPerms)
@@ -221,11 +219,5 @@ var ApplicationsList = {
   }
 };
 
-window.addEventListener('hashchange', function onHashChange(evt) {
-  if (!evt.newURL.endsWith('#appPermissions'))
-    return;
-
-  window.removeEventListener('hashchange', onHashChange);
-  ApplicationsList.init();
-});
+onLocalized(ApplicationsList.init.bind(ApplicationsList));
 

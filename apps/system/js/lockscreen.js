@@ -45,19 +45,14 @@ var LockScreen = {
   passCodeRequestTimeout: 0,
 
   /*
-  * Store the time that screen is off
+  * Store the first time the screen went off since unlocking.
   */
   _screenOffTime: 0,
 
   /*
   * Check the timeout of passcode lock
   */
-  _passcodeTimeoutCheck: false,
-
-  /*
-  * passcode to enable the smiley face easter egg.
-  */
-  smileyCode: '1337',
+  _passCodeTimeoutCheck: false,
 
   /*
   * Current passcode entered by the user
@@ -195,7 +190,11 @@ var LockScreen = {
         // we would need to lock the screen again
         // when it's being turned back on
         if (!evt.detail.screenEnabled) {
-          this._screenOffTime = new Date().getTime();
+          // Don't update the time after we're already locked otherwise turning
+          // the screen off again will bypass the passcode before the timeout.
+          if (!this.locked) {
+            this._screenOffTime = new Date().getTime();
+          }
         } else {
           var _screenOffInterval = new Date().getTime() - this._screenOffTime;
           if (_screenOffInterval > this.passCodeRequestTimeout * 1000) {
@@ -566,6 +565,8 @@ var LockScreen = {
     var wasAlreadyLocked = this.locked;
     this.locked = true;
 
+    this.updateTime();
+
     this.switchPanel();
 
     this.overlay.focus();
@@ -577,8 +578,6 @@ var LockScreen = {
     this.mainScreen.classList.add('locked');
 
     screen.mozLockOrientation('portrait-primary');
-
-    this.updateTime();
 
     if (!wasAlreadyLocked) {
       if (document.mozFullScreen)
@@ -698,10 +697,13 @@ var LockScreen = {
     var overlay = this.overlay;
     var self = this;
     panel = panel || 'main';
+
     this.loadPanel(panel, function panelLoaded() {
       self.unloadPanel(overlay.dataset.panel, panel,
         function panelUnloaded() {
-          self.dispatchEvent('lockpanelchange');
+          if (overlay.dataset.panel !== panel)
+            self.dispatchEvent('lockpanelchange');
+
           overlay.dataset.panel = panel;
         });
     });
@@ -852,9 +854,6 @@ var LockScreen = {
   },
 
   checkPassCode: function lockscreen_checkPassCode() {
-    if (this.passCodeEntered === this.smileyCode)
-      this.overlay.classList.add('smiley');
-
     if (this.passCodeEntered === this.passCode) {
       this.overlay.dataset.passcodeStatus = 'success';
       this.passCodeError = 0;

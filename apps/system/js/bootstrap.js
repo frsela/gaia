@@ -4,22 +4,15 @@
 'use strict';
 
 window.addEventListener('load', function startup() {
-  function launchHomescreen() {
-    var activity = new MozActivity({
-      name: 'view',
-      data: { type: 'application/x-application-list' }
-    });
-    activity.onerror = function homescreenLaunchError() {
-      console.error('Failed to launch home screen with activity.');
-    };
+  function firstAppManager(homescreenApp) {
+    WindowManager.retrieveFTU();
   }
-
   if (Applications.ready) {
-    launchHomescreen();
+    WindowManager.retrieveHomescreen(firstAppManager);
   } else {
     window.addEventListener('applicationready', function appListReady(event) {
       window.removeEventListener('applicationready', appListReady);
-      launchHomescreen();
+      WindowManager.retrieveHomescreen(firstAppManager);
     });
   }
 

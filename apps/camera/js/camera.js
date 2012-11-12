@@ -7,6 +7,7 @@ var Camera = {
   _cameras: null,
   _camera: 0,
   _captureMode: null,
+  _recording: false,
 
   // In secure mode the user cannot browse to the gallery
   _secureMode: window.parent !== window,
@@ -62,7 +63,16 @@ var Camera = {
     fileFormat: 'jpeg'
   },
 
-  _videoConfig: {
+  get _previewConfig() {
+    delete this._previewConfig;
+    return this._previewConfig = {
+      width: document.body.clientHeight,
+      height: document.body.clientWidth
+    };
+  },
+
+  _previewConfigVideo: {
+    profile: 'cif',
     rotation: 90,
     width: 352,
     height: 288
@@ -70,12 +80,16 @@ var Camera = {
 
   _shutterSound: new Audio('./resources/sounds/shutter.ogg'),
 
-  DCF_KEY: 'dcf_key',
-  DCF_POSTFIX: 'MZFFO',
-  _dcf_seq: null,
+  _dcfConfig: {
+    key: 'dcf_key',
+    seq: {file: 1, dir: 100},
+    postFix: 'MZLLA',
+    video: {prefix: 'VID_'},
+    image: {prefix: 'IMG_'}
+  },
 
   THUMB_WIDTH: 40,
-  THUBM_HEIGHT: 40,
+  THUMB_HEIGHT: 40,
 
   // Because we dont want to wait for the geolocation query
   // before we can take a photo, we keep a track of the users
@@ -87,16 +101,14 @@ var Camera = {
 
   _pendingPick: null,
 
-  // How many seconds we wait between collecting available disk space
-  DISK_SAMPLE_RATE: 1,
-  // How many disk samples we store, we dont want to just average 2 samples
-  // as they might spike
-  DISK_SAMPLE_SIZE: 10,
-  // Amount of seconds of streaming the disk can support before we
-  // stop recording
-  DISK_BUFFER: 10,
+  // The minimum available disk space to start recording a video.
+  RECORD_SPACE_MIN: 1024 * 1024 * 2,
 
-  _diskSpace: [],
+  // Number of bytes left on disk to let us stop recording.
+  RECORD_SPACE_PADDING: 1024 * 1024 * 1,
+
+  // Maximum image resolution for still photos taken with camera
+  MAX_IMAGE_RES: 1024 * 768, // was: 1600*1200
 
   get overlayTitle() {
     return document.getElementById('overlay-title');
@@ -148,6 +160,12 @@ var Camera = {
 
   init: function camera_init() {
 
+    // Dont let the phone go to sleep while the camera is
+    // active, user must manually close it
+    if (navigator.requestWakeLock) {
+      navigator.requestWakeLock('screen');
+    }
+
     this._storageState = this.STORAGE_INIT;
     this.setCaptureMode(this.CAMERA);
     this.initPositionUpdate();
@@ -163,6 +181,7 @@ var Camera = {
     this.toggleButton.addEventListener('click', this.toggleCamera.bind(this));
     this.toggleFlashBtn.addEventListener('click', this.toggleFlash.bind(this));
     this.viewfinder.addEventListener('click', this.toggleFilmStrip.bind(this));
+    this.filmStrip.addEventListener('click', this.filmStripPressed.bind(this));
 
     this.switchButton
       .addEventListener('click', this.toggleModePressed.bind(this));
@@ -183,13 +202,9 @@ var Camera = {
     this._pictureStorage
       .addEventListener('change', this.deviceStorageChangeHandler.bind(this));
 
-    asyncStorage.getItem(this.DCF_KEY, (function(value) {
-      if (!value) {
-        // TODO: Scan the filesystem, currently blocked by
-        // https://bugzilla.mozilla.org/show_bug.cgi?id=798304
-        this._dcf_seq = {file: 1, dir: 1};
-      } else {
-        this._dcf_seq = value;
+    asyncStorage.getItem(this._dcfConfig.key, (function(value) {
+      if (value) {
+        this._dcfConfig.seq = value;
       }
 
       this.setToggleCameraStyle();
@@ -203,6 +218,18 @@ var Camera = {
     }).bind(this));
   },
 
+  enableButtons: function camera_enableButtons() {
+    this.switchButton.removeAttribute('disabled');
+    this.captureButton.removeAttribute('disabled');
+  },
+
+  disableButtons: function camera_disableButtons() {
+    this.switchButton.setAttribute('disabled', 'disabled');
+    this.captureButton.setAttribute('disabled', 'disabled');
+  },
+
+  // When inside an activity the user cannot switch between
+  // the gallery or video recording.
   initActivity: function camera_initActivity() {
     this.galleryButton.setAttribute('disabled', 'disabled');
     this.switchButton.setAttribute('disabled', 'disabled');
@@ -226,18 +253,19 @@ var Camera = {
     }
 
     var newMode = (this.captureMode === this.CAMERA) ? this.VIDEO : this.CAMERA;
+    this.disableButtons();
     this.setCaptureMode(newMode);
 
     function gotPreviewStream(stream) {
       this.viewfinder.mozSrcObject = stream;
       this.viewfinder.play();
+      this.enableButtons();
     }
     if (this.captureMode === this.CAMERA) {
-      // TODO: fix this so we can just call getPreviewStream()
-      // or toggle a mode, or something
-      this.setSource(this._camera); // STOMP
+      this._cameraObj.getPreviewStream(this._previewConfig,
+                                       gotPreviewStream.bind(this));
     } else {
-      this._cameraObj.getPreviewStreamVideoMode(this._videoConfig,
+      this._cameraObj.getPreviewStreamVideoMode(this._previewConfigVideo,
                                                 gotPreviewStream.bind(this));
     }
   },
@@ -268,27 +296,8 @@ var Camera = {
     this._cameraObj.flashMode = flashModeName;
   },
 
-  createVideoFilename: function camera_createVideoFilename() {
-    // TODO: Currently a bug specifying directories
-    // https://bugzilla.mozilla.org/show_bug.cgi?id=798304
-    //
-    // var path =  this.padLeft(this._dcf_seq.dir, 3) +
-    //   this.DCF_POSTFIX + '/' +
-    //   'VID_' + this.padLeft(this._dcf_seq.file, 4) + '.3gp';
-    var path = 'VID_' + this.padLeft(this._dcf_seq.file, 4) + '.3gp';
-
-    if (this._dcf_seq.file < 9999) {
-      this._dcf_seq.file += 1;
-    } else {
-      this._dcf_seq.file = 0;
-      this._dcf_seq.dir += 1;
-    }
-    asyncStorage.setItem(this.DCF_KEY, this._dcf_seq);
-    return path;
-  },
-
   toggleRecording: function camera_toggleRecording() {
-    if (document.body.classList.contains('capturing')) {
+    if (this._recording) {
       this.stopRecording();
       return;
     }
@@ -299,23 +308,57 @@ var Camera = {
   startRecording: function camera_startRecording() {
     var captureButton = this.captureButton;
     var switchButton = this.switchButton;
-    this._videoPath = this.createVideoFilename();
 
+    var onerror = function() handleError('error-recording');
     var onsuccess = (function onsuccess() {
-      captureButton.removeAttribute('disabled');
       document.body.classList.add('capturing');
+      captureButton.removeAttribute('disabled');
+      this._recording = true;
       this.startRecordingTimer();
+      // User closed app while recording was trying to start
+      if (document.mozHidden) {
+        this.stopRecording();
+      }
     }).bind(this);
 
-    var onerror = function onerror() {
-      captureButton.removeAttribute('disabled');
-      switchButton.removeAttribute('disabled');
-    };
+    var handleError = (function handleError(id) {
+      this.enableButtons();
+      this.showOverlay(id);
+    }).bind(this);
 
-    switchButton.setAttribute('disabled', 'disabled');
-    captureButton.setAttribute('disabled', 'disabled');
-    this._cameraObj.startRecording(this._videoStorage, this._videoPath,
-                                   onsuccess, onerror);
+    this.disableButtons();
+
+    var startRecording = (function startRecording(freeBytes) {
+      if (freeBytes < this.RECORD_SPACE_MIN) {
+        handleError('nospace');
+        return;
+      }
+
+      var config = {
+        rotation: 90,
+        maxFileSizeBytes: freeBytes - this.RECORD_SPACE_PADDING
+      };
+      this._cameraObj.startRecording(config,
+                                     this._videoStorage, this._videoPath,
+                                     onsuccess, onerror);
+    }).bind(this);
+
+    this.createDCFFilename('video', '3gp', (function(filename) {
+      this._videoPath = filename;
+      // The CameraControl API will not automatically create directories
+      // for the new file if they do not exist, so write a stub file
+      // via the deviceStorage API which will, then start recording
+      // over it
+      var stub = new Blob([''], {'type': 'video\/3gpp'});
+      var req = this._videoStorage.addNamed(stub, filename);
+      req.onerror = onerror;
+      req.onsuccess = (function fileCreated() {
+        // Determine the number of bytes available on disk.
+        var stat = this._videoStorage.stat();
+        stat.onerror = onerror;
+        stat.onsuccess = function() startRecording(stat.result.freeBytes);
+      }).bind(this);
+    }).bind(this));
   },
 
   addToFilmStrip: function camera_addToFilmStrip(name, thumbnail, type) {
@@ -331,10 +374,14 @@ var Camera = {
   },
 
   generateVideoThumbnail: function camera_generateVideoThumbnail(callback) {
-    var self = this;
+    var video;
     var preview = this._videoPreview;
-    this._videoStorage.get(this._videoPath).onsuccess = function(e) {
-      var video = e.target.result;
+    var thumbGenerated = function() {
+      callback(blob, video.type);
+    }
+
+    this._videoStorage.get(this._videoPath).onsuccess = (function(e) {
+      video = e.target.result;
       // TODO: This check shouldnt be needed as we wont be recording
       // in a format we cannot play
       // https://bugzilla.mozilla.org/show_bug.cgi?id=799306
@@ -346,27 +393,32 @@ var Camera = {
       preview.preload = 'metadata';
       preview.width = self.THUMB_WIDTH + 'px';
       preview.height = self.THUMB_HEIGHT + 'px';
-      preview = url;
-      preview.onloadedmetadata = function() {
-        URL.revokeObjectURL(url);
-        var image;
-        try {
-          var canvas = document.createElement('canvas');
-          var ctx = canvas.getContext('2d');
-          canvas.width = self.THUMB_WIDTH;
-          canvas.height = self.THUMB_HEIGHT;
-          ctx.drawImage(preview, 0, 0, self.THUMB_WIDTH, self.THUMB_HEIGHT);
-          image = canvas.mozGetAsFile('poster', 'image/jpeg');
-        } catch (e) {
-          console.error('Failed to create a poster image:', e);
-        }
-        callback(image, video.type);
-      };
-    };
+      preview.src = url;
+      preview.onloadedmetadata =
+        this.generateThumbnail.bind(this, preview, thumbGenerated);
+    }).bind(this);
+  },
+
+  generateImageThumbnail: function camera_generateImageThumbnail(input, callback) {
+    var img = document.createElement('img');
+    img.src = window.URL.createObjectURL(input);
+    img.onload = this.generateThumbnail.bind(this, img, callback);
+  },
+
+  generateThumbnail: function camera_generateThumbnail(input, callback) {
+    var canvas = document.createElement('canvas');
+    canvas.width = this.THUMB_WIDTH;
+    canvas.height = this.THUMB_HEIGHT;
+    URL.revokeObjectURL(input.src);
+    try {
+      canvas.getContext('2d').drawImage(input, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(callback);
+    } catch (e) {
+      console.error('Failed to create a poster image:', e);
+    }
   },
 
   startRecordingTimer: function camera_startRecordingTimer() {
-    this._diskSpace = [];
     this._videoStart = new Date().getTime();
     this.videoTimer.textContent = this.formatTimer(0);
     this._videoTimer =
@@ -377,44 +429,13 @@ var Camera = {
     var videoLength =
       Math.round((new Date().getTime() - this._videoStart) / 1000);
     this.videoTimer.textContent = this.formatTimer(videoLength);
-
-    if (videoLength % this.DISK_SAMPLE_RATE !== 0) {
-      return;
-    }
-
-    // Check the amount of storage we have available and stop recording
-    // before we fill the sdcard
-    this._videoStorage.stat().onsuccess = (function(e) {
-      var freeBytes = e.target.result.freeBytes;
-      this._diskSpace.push(freeBytes);
-      if (this._diskSpace.length > this.DISK_SAMPLE_SIZE) {
-        this._diskSpace.shift();
-      }
-
-      if (this._diskSpace.length < 2) {
-        return;
-      }
-
-      // Find the average amount of diskspace we are consuming per second
-      // If we are overwriting a file, freeBytes will stay constant until
-      // we start exceeding the original filesize, so we need to handle
-      // 0 bytes used
-      var diskUsed = this._diskSpace[0] - freeBytes;
-      var diskRate = diskUsed > 0 ?
-        diskUsed / (this._diskSpace.length * this.DISK_SAMPLE_RATE) : 0;
-
-      if ((freeBytes - (diskRate * this.DISK_BUFFER)) < 0) {
-        this.stopRecording();
-      }
-
-    }).bind(this);
   },
 
   stopRecording: function camera_stopRecording() {
     this._cameraObj.stopRecording();
+    this._recording = false;
     window.clearInterval(this._videoTimer);
-
-    this.switchButton.removeAttribute('disabled');
+    this.enableButtons();
     document.body.classList.remove('capturing');
     this.generateVideoThumbnail((function(thumbnail, videotype) {
       if (!thumbnail) {
@@ -464,16 +485,18 @@ var Camera = {
   },
 
   orientChange: function camera_orientChange(e) {
+    // Orientation is 0 starting at 'natural portrait' increasing
+    // going clockwise
     var orientation = (e.beta > 45) ? 180 :
       (e.beta < -45) ? 0 :
-      (e.gamma < -45) ? 270 :
-      (e.gamma > 45) ? 90 : 0;
+      (e.gamma < -45) ? 90 :
+      (e.gamma > 45) ? 270 : 0;
 
     if (orientation !== this._phoneOrientation) {
       var rule = this._styleSheet.cssRules[this._orientationRule];
       // PLEASE DO SOMETHING KITTENS ARE DYING
       // Setting MozRotate to 90 or 270 causes element to disappear
-      rule.style.MozTransform = 'rotate(' + (orientation + 1) + 'deg)';
+      rule.style.MozTransform = 'rotate(' + -(orientation + 1) + 'deg)';
       this._phoneOrientation = orientation;
     }
   },
@@ -495,43 +518,56 @@ var Camera = {
   },
 
   filmStripPressed: function camera_filmStripPressed(e) {
-    if (this._secureMode) {
+    var camera = this;
+    var target = e.target;
+    if (target.nodeName === 'IMG') {
+      target = target.parentNode;
+    }
+
+    var filename = target.getAttribute('data-filename');
+    var filetype = target.getAttribute('data-filetype');
+
+    if (this._secureMode || !filename) {
       return;
     }
 
     // Launch the gallery with an open activity to view this specific photo
-    var filename = e.target.getAttribute('data-filename');
-    var filetype = e.target.getAttribute('data-filetype');
     var storage = this._pictureStorage;
+    var getreq = storage.get(filename);
 
-    var a = new MozActivity({
-      name: 'open',
-      data: {
-        type: filetype,
-        filename: filename
-      }
-    });
-
-    // XXX: this seems like it should not be necessary
-    function reopen() {
-      navigator.mozApps.getSelf().onsuccess = function getSelfCB(evt) {
-        evt.target.result.launch();
-      };
-    }
-
-    a.onerror = function(e) {
-      reopen();
-      console.warn('open activity error:', a.error.name);
+    getreq.onerror = function() {
+      console.warn('failed to get file:', filename, getreq.error.name);
     };
-    a.onsuccess = function(e) {
-      reopen();
 
-      if (a.result.delete) {
-        storage.delete(filename).onerror = function(e) {
-          console.error('Failed to delete', filename,
-                        'from DeviceStorage:', e.target.error);
-        };
-      }
+    getreq.onsuccess = function() {
+      var file = getreq.result;
+      var a = new MozActivity({
+        name: 'open',
+        data: {
+          type: filetype,
+          blob: file,
+          show_delete_button: true
+        }
+      });
+
+      // We don't seem to get a mozvisiblitychange event when the
+      // inline open activity opens up, so we explicitly stop the
+      // and restart the preview stream
+      camera.stopPreview();
+
+      a.onerror = function(e) {
+        console.warn('open activity error:', a.error.name);
+        camera.startPreview();
+      };
+      a.onsuccess = function(e) {
+        camera.startPreview();
+        if (a.result.delete) {
+          storage.delete(filename).onerror = function(e) {
+            console.warn('Failed to delete', filename,
+                         'from DeviceStorage:', e.target.error);
+          };
+        }
+      };
     };
   },
 
@@ -553,10 +589,10 @@ var Camera = {
     if (camera == 1) {
       /* backwards-facing camera */
       transform += ' scale(-1, 1)';
-      rotation = 270;
+      rotation = 0;
     } else {
       /* forwards-facing camera */
-      rotation = 90;
+      rotation = 0;
     }
 
     style.MozTransform = transform;
@@ -567,6 +603,7 @@ var Camera = {
     var options = {camera: this._cameras[this._camera]};
 
     function gotPreviewScreen(stream) {
+      this.enableButtons();
       this._previewActive = true;
       viewfinder.mozSrcObject = stream;
       viewfinder.play();
@@ -579,15 +616,22 @@ var Camera = {
       this._autoFocusSupported =
         camera.capabilities.focusModes.indexOf('auto') !== -1;
       this._pictureSize =
-        this.largestPictureSize(camera.capabilities.pictureSizes);
-      var config = {
-        height: height,
-        width: width
-      };
+        this.pickPictureSize(camera.capabilities.pictureSizes);
       this.enableCameraFeatures(camera.capabilities);
-      camera.getPreviewStream(config, gotPreviewScreen.bind(this));
+      camera.onShutter = (function() {
+        this._shutterSound.play();
+      }).bind(this);
+      camera.onRecorderStateChange = this.recordingStateChanged.bind(this);
+      camera.getPreviewStream(this._previewConfig, gotPreviewScreen.bind(this));
     }
     navigator.mozCameras.getCamera(options, gotCamera.bind(this));
+  },
+
+  recordingStateChanged: function(msg) {
+    if (msg === 'FileSizeLimitReached') {
+      this.stopRecording();
+      alert(navigator.mozL10n.get('size-limit-reached'));
+    }
   },
 
   enableCameraFeatures: function camera_enableCameraFeatures(capabilities) {
@@ -606,27 +650,28 @@ var Camera = {
     }
   },
 
-  start: function camera_start() {
+  startPreview: function camera_startPreview() {
     this.viewfinder.play();
     this.setSource(this._camera);
     this._previewActive = true;
     this.initPositionUpdate();
   },
 
-  stop: function camera_stop() {
-    this.pause();
+  stopPreview: function camera_stopPreview() {
+    if (this._recording) {
+      this.stopRecording();
+    }
+    this.disableButtons();
+    this.viewfinder.pause();
+    this._previewActive = false;
     this.viewfinder.mozSrcObject = null;
     this.cancelPositionUpdate();
   },
 
-  pause: function camera_pause() {
-    this.viewfinder.pause();
-    this._previewActive = false;
-  },
-
-  resume: function camera_resume() {
+  resumePreview: function camera_resumePreview() {
     this._cameraObj.resumePreview();
     this._previewActive = true;
+    this.enableButtons();
   },
 
   showFilmStrip: function camera_showFilmStrip() {
@@ -639,13 +684,14 @@ var Camera = {
     this._photosTaken.forEach(function foreach_photos(image) {
       var wrapper = document.createElement('div');
       var preview = document.createElement('img');
+      wrapper.style.visibility = 'hidden';
       wrapper.classList.add('thumbnail');
       wrapper.classList.add(/image/.test(image.type) ? 'image' : 'video');
-      wrapper.setAttribute('data-type', image.type);
+      wrapper.setAttribute('data-filetype', image.type);
       wrapper.setAttribute('data-filename', image.name);
       preview.src = window.URL.createObjectURL(image.blob);
-      preview.onclick = this.filmStripPressed.bind(this);
       preview.onload = function() {
+        wrapper.style.visibility = 'visible';
         window.URL.revokeObjectURL(this.src);
       };
       wrapper.appendChild(preview);
@@ -664,57 +710,84 @@ var Camera = {
   },
 
   restartPreview: function camera_restartPreview() {
-    this.captureButton.removeAttribute('disabled');
     this._filmStripTimer =
       window.setTimeout(this.hideFilmStrip.bind(this), 5000);
     this._resumeViewfinderTimer =
-      window.setTimeout(this.resume.bind(this), this.PREVIEW_PAUSE);
+      window.setTimeout(this.resumePreview.bind(this), this.PREVIEW_PAUSE);
   },
 
-  _dataURLFromBlob: function camera_dataURLFromBlob(blob, type, callback) {
-    var url = URL.createObjectURL(blob);
-    var img = new Image();
-    img.src = url;
-    img.onload = function() {
-      var canvas = document.createElement('canvas');
-      var context = canvas.getContext('2d');
-      canvas.width = img.naturalWidth;
-      canvas.height = img.naturalHeight;
-      context.drawImage(img, 0, 0);
-      callback(canvas.toDataURL(type));
-      URL.revokeObjectURL(url);
-    }
+  createDCFFilename: function camera_createDCFFilename(type, ext, callback) {
+    var self = this;
+    var dcf = this._dcfConfig;
+    var filename = dcf[type].prefix + this.padLeft(dcf.seq.file, 4) + '.' + ext;
+    var path = 'DCIM/' + dcf.seq.dir + dcf.postFix + '/' + filename;
+    var storage = type === 'video' ? this._videoStorage : this._pictureStorage;
+
+    // A file with this name may have been written by the user or
+    // our indexeddb sequence tracker was cleared, check we wont overwrite
+    // anything
+    var req = storage.get(path);
+
+    // A file existed, we bump the directory then try to generate a
+    // new filename
+    req.onsuccess = function() {
+      dcf.seq.file = 1;
+      dcf.seq.dir += 1;
+      asyncStorage.setItem(dcf.key, dcf.seq, function() {
+        self.createDCFFilename(type, ext, callback);
+      });
+    };
+
+    // No file existed, we are good to go
+    req.onerror = function() {
+      if (dcf.seq.file < 9999) {
+        dcf.seq.file += 1;
+      } else {
+        dcf.seq.file = 1;
+        dcf.seq.dir += 1;
+      }
+      asyncStorage.setItem(dcf.key, dcf.seq, function() {
+        callback(path);
+      });
+    };
   },
 
   takePictureSuccess: function camera_takePictureSuccess(blob) {
     this._manuallyFocused = false;
     this.hideFocusRing();
     this.restartPreview();
+    this.createDCFFilename('image', 'jpg', (function(name) {
+      var addreq = this._pictureStorage.addNamed(blob, name);
+      addreq.onsuccess = (function() {
+        if (this._pendingPick) {
+          // XXX: https://bugzilla.mozilla.org/show_bug.cgi?id=806503
+          // We ought to just be able to pass this blob to the activity.
+          // But there seems to be a bug with blob lifetimes and activities.
+          // So we'll get a new blob back out of device storage to ensure
+          // that we've got a file-backed blob instead of a memory-backed blob.
+          var getreq = this._pictureStorage.get(name);
+          getreq.onsuccess = (function() {
+            this._pendingPick.postResult({
+              type: 'image/jpeg',
+              blob: getreq.result
+            });
+            this.cancelActivity();
+          }).bind(this);
 
-    var f = new navigator.mozL10n.DateTimeFormat();
-    var rightnow = new Date();
-    var name = 'DCIM/img_' + f.localeFormat(rightnow, '%Y%m%d-%H%M%S') + '.jpg';
-    var addreq = this._pictureStorage.addNamed(blob, name);
+          return;
+        }
 
-    addreq.onsuccess = (function() {
-      if (this._pendingPick) {
-        var type = 'image/jpeg';
-        this._dataURLFromBlob(blob, type, function(name) {
-          this._pendingPick.postResult({
-            type: type,
-            url: name
-          });
-          this.cancelActivity();
-        }.bind(this));
-        return;
-      }
-      this.addToFilmStrip(name, blob, 'image/jpeg');
-      this.checkStorageSpace();
-    }).bind(this);
+        this.generateImageThumbnail(blob, (function(thumbBlob) {
+          this.addToFilmStrip(name, thumbBlob, 'image/jpeg');
+          this.checkStorageSpace();
+        }).bind(this));
 
-    addreq.onerror = (function() {
-      this.showOverlay('error-saving');
-    }).bind(this);
+      }).bind(this);
+
+      addreq.onerror = function() {
+        alert(navigator.mozL10n.get('error-saving-text'));
+      };
+    }).bind(this));
   },
 
   hideFocusRing: function camera_hideFocusRing() {
@@ -722,7 +795,7 @@ var Camera = {
   },
 
   checkStorageSpace: function camera_checkStorageSpace() {
-    if (this.showDialog()) {
+    if (this.updateOverlay()) {
       return;
     }
     var MAX_IMAGE_SIZE = this._pictureSize.width * this._pictureSize.height *
@@ -733,7 +806,7 @@ var Camera = {
       // If we have not yet checked the state of the storage, do so
       if (this._storageState === this.STORAGE_INIT) {
         this.updateStorageState(stats.state);
-        this.showDialog();
+        this.updateOverlay();
       }
 
       if (this._storageState !== this.STORAGE_AVAILABLE) {
@@ -742,7 +815,7 @@ var Camera = {
       if (stats.freeBytes < MAX_IMAGE_SIZE) {
         this._storageState = this.STORAGE_CAPACITY;
       }
-      this.showDialog();
+      this.updateOverlay();
 
     }).bind(this);
   },
@@ -783,7 +856,7 @@ var Camera = {
     }
   },
 
-  showDialog: function camera_showDialog() {
+  updateOverlay: function camera_updateOverlay() {
     if (this._storageState === this.STORAGE_INIT) {
       return false;
     }
@@ -792,7 +865,7 @@ var Camera = {
       // Preview may have previously been paused if storage
       // was not available
       if (!this._previewActive && !document.mozHidden) {
-        this.start();
+        this.startPreview();
       }
       this.showOverlay(null);
       return false;
@@ -810,13 +883,13 @@ var Camera = {
       break;
     }
     if (this._previewActive) {
-      this.stop();
+      this.stopPreview();
     }
     return true;
   },
 
   prepareTakePicture: function camera_takePicture() {
-    this.captureButton.setAttribute('disabled', 'disabled');
+    this.disableButtons();
     this.focusRing.setAttribute('data-state', 'focusing');
     if (this._autoFocusSupported && !this._manuallyFocused) {
       this._cameraObj.autoFocus(this.autoFocusDone.bind(this));
@@ -827,8 +900,8 @@ var Camera = {
 
   autoFocusDone: function camera_autoFocusDone(success) {
     if (!success) {
+      this.enableButtons();
       this.focusRing.setAttribute('data-state', 'fail');
-      this.captureButton.removeAttribute('disabled');
       window.setTimeout(this.hideFocusRing.bind(this), 1000);
       return;
     }
@@ -837,20 +910,13 @@ var Camera = {
   },
 
   takePicture: function camera_takePicture() {
-    this._config.rotation =
-      this.layoutToPhoneOrientation(this._phoneOrientation);
+    this._config.rotation = this._phoneOrientation;
+    this._config.pictureSize = this._pictureSize;
     if (this._position) {
       this._config.position = this._position;
     }
-    this._shutterSound.play();
     this._cameraObj
       .takePicture(this._config, this.takePictureSuccess.bind(this));
-  },
-
-  // The layout (icons) and the phone calculate orientation in the
-  // opposite direction
-  layoutToPhoneOrientation: function camera_layoutToPhoneOrientation() {
-    return 270 - this._phoneOrientation;
   },
 
   showOverlay: function camera_showOverlay(id) {
@@ -866,14 +932,18 @@ var Camera = {
     this.overlay.classList.remove('hidden');
   },
 
-  largestPictureSize: function camera_largestPictureSize(pictureSizes) {
-    return pictureSizes.reduce(function(acc, size) {
-      if (size.width + size.height > acc.width + acc.height) {
-        return size;
-      } else {
-        return acc;
-      }
-    });
+  pickPictureSize: function camera_pickPictureSize(pictureSizes) {
+    var maxRes = this.MAX_IMAGE_RES;
+    var size = pictureSizes.reduce(function(acc, size) {
+      var mp = size.width * size.height;
+      return (mp > acc.width * acc.height && mp <= maxRes) ? size : acc;
+    }, {width: 0, height: 0});
+
+    if (size.width === 0 && size.height === 0) {
+      return pictureSizes[0];
+    } else {
+      return size;
+    }
   },
 
   initPositionUpdate: function camera_initPositionUpdate() {
@@ -923,10 +993,10 @@ window.addEventListener('DOMContentLoaded', function CameraInit() {
 
 document.addEventListener('mozvisibilitychange', function() {
   if (document.mozHidden) {
-    Camera.stop();
+    Camera.stopPreview();
     Camera.cancelActivity(true);
   } else {
-    Camera.start();
+    Camera.startPreview();
   }
 });
 

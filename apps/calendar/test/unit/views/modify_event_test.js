@@ -10,7 +10,6 @@ suite('views/modify_event', function() {
 
   var subject;
   var controller;
-  var event;
   var app;
   var fmt;
 
@@ -65,8 +64,11 @@ suite('views/modify_event', function() {
     div.innerHTML = [
       '<div id="modify-event-view">',
         '<button class="save">save</button>',
+        '<button class="cancel">cancel</button>',
         '<button class="delete-record">delete</button>',
-        '<div class="errors"></div>',
+        '<section role="status">',
+          '<div class="errors"></div>',
+        '</section>',
         '<form>',
           '<input type="checkbox" name="allday" />',
           '<input name="title" />',
@@ -127,6 +129,14 @@ suite('views/modify_event', function() {
     assert.ok(subject._fields, 'has fields');
   });
 
+  test('.status', function() {
+    assert.ok(subject.status);
+  });
+
+  test('.errors', function() {
+    assert.ok(subject.errors);
+  });
+
   test('.form', function() {
     assert.ok(subject.form);
     assert.equal(subject.form.tagName.toLowerCase(), 'form');
@@ -150,11 +160,11 @@ suite('views/modify_event', function() {
 
       controller.findAssociated = function() {
         calledLoad = arguments;
-      }
+      };
 
       subject._displayModel = function() {
         calledUpdate = arguments;
-      }
+      };
     });
 
     test('when change token is same', function() {
@@ -228,7 +238,6 @@ suite('views/modify_event', function() {
         currentCalendar: calendar.name
       };
 
-
       var key;
 
       subject.onfirstseen();
@@ -285,6 +294,34 @@ suite('views/modify_event', function() {
       assert.equal(subject.provider, app.provider('Abstract'));
       assert.ok(getField('title').readOnly, 'marks readonly');
 
+    });
+
+    test('use busytime instance when isRecurring', function() {
+      var eventRecurring = Factory('event', {
+        calendarId: 'foo',
+        remote: {
+          isRecurring: true,
+          startDate: new Date(2012, 1, 1),
+          endDate: new Date(2012, 1, 5)
+        }
+      });
+      var busytimeRecurring = Factory('busytime', {
+        eventId: eventRecurring._id,
+        startDate: new Date(2012, 10, 30),
+        endDate: new Date(2012, 10, 31)
+      });
+
+      subject.useModel(busytimeRecurring, eventRecurring);
+
+      var expected = {
+        startDate: busytimeRecurring.startDate,
+        endDate: busytimeRecurring.endDate
+      };
+
+      assert.hasProperties(
+        subject.formData(),
+        expected
+      );
     });
 
     test('when start & end times are 00:00:00', function() {
@@ -364,7 +401,7 @@ suite('views/modify_event', function() {
       setup(function() {
         subject._loadModel = function() {
           calledWith = arguments;
-        }
+        };
       });
 
       test('existing model', function() {
@@ -514,8 +551,10 @@ suite('views/modify_event', function() {
     var redirectTo;
     var provider;
     var list;
+    var calledWith;
 
     setup(function() {
+      calledWith = null;
       provider = eventStore.providerFor(event);
       list = subject.element.classList;
 
@@ -524,21 +563,40 @@ suite('views/modify_event', function() {
       };
     });
 
+    function haltsOnError() {
+      test('does not save when validator errors occurs', function() {
+        var event = subject.event;
+        var errors = [];
+        var displayedErrors;
+
+        subject.showErrors = function() {
+          displayedErrors = arguments;
+        };
+
+        event.validationErrors = function() {
+          return errors;
+        };
+
+        subject.save();
+
+        assert.ok(!calledWith, 'does not save');
+        assert.deepEqual(displayedErrors[0], errors, 'shows errors');
+      });
+    }
+
     suite('update', function() {
-      var calledWith;
-
       setup(function() {
-        calledWith = null;
-
         provider.updateEvent = function() {
           calledWith = arguments;
-        }
+        };
 
         subject.onfirstseen();
         subject.useModel(busytime, event);
 
         subject._returnTo = '/foo';
       });
+
+      haltsOnError();
 
       test('with provider that can edit', function() {
         setFieldValue('calendarId', calendar._id);
@@ -567,11 +625,7 @@ suite('views/modify_event', function() {
     });
 
     suite('create', function() {
-      var calledWith;
-
       setup(function() {
-        calledWith = null;
-
         provider.createEvent = function() {
           calledWith = arguments;
         };
@@ -583,6 +637,8 @@ suite('views/modify_event', function() {
         // must come after dispatch
         subject._returnTo = '/foo';
       });
+
+      haltsOnError();
 
       test('with provider that can create', function() {
         assert.ok(!subject.provider, 'has no provider yet');
@@ -800,7 +856,7 @@ suite('views/modify_event', function() {
 
       provider.createEvent = function() {
         calledWith = arguments;
-      }
+      };
 
       triggerEvent(subject.form, 'submit');
       assert.ok(calledWith);
@@ -813,7 +869,7 @@ suite('views/modify_event', function() {
 
       provider.deleteEvent = function() {
         done();
-      }
+      };
 
       triggerEvent(subject.deleteButton, 'click');
     });
@@ -827,7 +883,7 @@ suite('views/modify_event', function() {
 
       provider.createEvent = function() {
         calledWith = arguments;
-      }
+      };
 
       triggerEvent(subject.saveButton, 'click');
       assert.ok(calledWith);
