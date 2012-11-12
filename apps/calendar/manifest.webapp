@@ -7,10 +7,12 @@
     "name": "The Gaia Team",
     "url": "https://github.com/mozilla-b2g/gaia"
   },
-  "messages": ["alarm"],
+  "messages": [
+     { "alarm": "/index.html" }
+  ],
   "permissions": {
     "systemXHR":{},
-    "settings":{},
+    "settings":{ "access": "readonly" },
     "alarms":{},
     "desktop-notification":{}
   },

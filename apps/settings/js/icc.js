@@ -26,7 +26,7 @@
   /**
    * Init
    */
-  var iccMenuItem = document.getElementById('iccMenuItem');
+  var iccMenuItem = document.getElementById('menuItem-icc');
   var iccStkList = document.getElementById('icc-stk-list');
   var iccStkHeader = document.getElementById('icc-stk-header');
   var iccStkSubheader = document.getElementById('icc-stk-subheader');
@@ -199,7 +199,7 @@
           resultCode: icc.STK_RESULT_OK
         });
         if (confirm(options.confirmMessage)) {
-          openURL(options.url);
+          openLink(options.url);
         }
         break;
 
@@ -426,7 +426,7 @@
     if (options.isAlphabet) {
       input.type = 'text';
     } else {
-      input.type = 'number';
+      input.type = 'tel';
     }
     if (options.defaultText) {
       input.value = options.defaultText;
@@ -498,7 +498,7 @@
    */
   function displayNotification(command) {
     var options = command.options;
-    NotificationHelper.send("STK", options.text);
+    NotificationHelper.send('STK', options.text);
   }
 
   /**
@@ -557,6 +557,5 @@
       app.launch('settings');
     };
   };
-
 })();
 

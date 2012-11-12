@@ -1133,9 +1133,9 @@ MailBody.prototype = {
 
   /**
    * Trigger the download of any inline images sent as part of the message.
-   * Once the images have been downloaded
+   * Once the images have been downloaded, invoke the provided callback.
    */
-  downloadEmbeddedImages: function(callback) {
+  downloadEmbeddedImages: function(callWhenDone, callOnProgress) {
     var relPartIndices = [];
     for (var i = 0; i < this._relatedParts.length; i++) {
       var relatedPart = this._relatedParts[i];
@@ -1144,10 +1144,12 @@ MailBody.prototype = {
       relPartIndices.push(i);
     }
     if (!relPartIndices.length) {
-      callback();
+      if (callWhenDone)
+        callWhenDone();
       return;
     }
-    this._api._downloadAttachments(this, relPartIndices, [], callback);
+    this._api._downloadAttachments(this, relPartIndices, [],
+                                   callWhenDone, callOnProgress);
   },
 
   /**
@@ -1163,7 +1165,8 @@ MailBody.prototype = {
       var relPart = this._relatedParts[i];
       // Related parts should all be stored as Blobs-in-IndexedDB
       if (relPart.file && !Array.isArray(relPart.file)) {
-        cidToObjectUrl[relPart.name] = useWin.URL.createObjectURL(relPart.file);
+        cidToObjectUrl[relPart.contentId] = useWin.URL.createObjectURL(
+          relPart.file);
       }
     }
     this._cleanup = function revokeURLs() {
@@ -1262,6 +1265,12 @@ MailAttachment.prototype = {
 
   get isDownloaded() {
     return !!this._file;
+  },
+
+  download: function(callWhenDone, callOnProgress) {
+    this._body._api._downloadAttachments(
+      this._body, [], [this._body.attachments.indexOf(this)],
+      callWhenDone, callOnProgress);
   },
 };
 
@@ -1473,6 +1482,14 @@ BridgedViewSlice.prototype = {
   },
 
   die: function() {
+    // Null out all listeners except for the ondead listener.  This avoids
+    // the callbacks from having to filter out messages from dead slices.
+    this.onadd = null;
+    this.onchange = null;
+    this.onsplice = null;
+    this.onremove = null;
+    this.onstatus = null;
+    this.oncomplete = null;
     this._api.__bridgeSend({
         type: 'killSlice',
         handle: this._handle
@@ -1555,9 +1572,7 @@ function MessageComposition(api, handle) {
 
   this._references = null;
   this._customHeaders = null;
-  // XXX attachments aren't implemented yet, of course.  They will be added
-  // via helper method.
-  this._attachments = null;
+  this.attachments = null;
 }
 MessageComposition.prototype = {
   toString: function() {
@@ -1581,6 +1596,24 @@ MessageComposition.prototype = {
   },
 
   /**
+   * @args[
+   *   @param[attachmentDef @dict[
+   *     @key[fileName String]
+   *     @key[blob Blob]
+   *   ]]
+   * ]
+   */
+  addAttachment: function(attachmentDef) {
+    this.attachments.push(attachmentDef);
+  },
+
+  removeAttachment: function(attachmentDef) {
+    var idx = this.attachments.indexOf(attachmentDef);
+    if (idx !== -1)
+      this.attachments.splice(idx, 1);
+  },
+
+  /**
    * Populate our state to send over the wire to the back-end.
    */
   _buildWireRep: function() {
@@ -1593,7 +1626,7 @@ MessageComposition.prototype = {
       body: this.body,
       referencesStr: this._references,
       customHeaders: this._customHeaders,
-      attachments: this._attachments,
+      attachments: this.attachments,
     };
   },
 
@@ -1914,6 +1947,7 @@ MailAPI.prototype = {
     delete this._slices[msg.handle];
     if (slice.ondead)
       slice.ondead(slice);
+    slice.ondead = null;
   },
 
   _getBodyForMessage: function(header, callback) {
@@ -1944,14 +1978,15 @@ MailAPI.prototype = {
   },
 
   _downloadAttachments: function(body, relPartIndices, attachmentIndices,
-                                 callback) {
+                                 callWhenDone, callOnProgress) {
     var handle = this._nextHandle++;
     this._pendingRequests[handle] = {
       type: 'downloadAttachments',
       body: body,
       relParts: relPartIndices.length > 0,
       attachments: attachmentIndices.length > 0,
-      callback: callback,
+      callback: callWhenDone,
+      progress: callOnProgress
     };
     this.__bridgeSend({
       type: 'downloadAttachments',
@@ -1972,11 +2007,11 @@ MailAPI.prototype = {
     delete this._pendingRequests[msg.handle];
 
     // What will have changed are the attachment lists, so update them.
-    if (msg.body) {
+    if (msg.bodyInfo) {
       if (req.relParts)
-        req.body._relatedParts = msg.body.relatedParts;
+        req.body._relatedParts = msg.bodyInfo.relatedParts;
       if (req.attachments) {
-        var wireAtts = msg.body.attachments;
+        var wireAtts = msg.bodyInfo.attachments;
         for (var i = 0; i < wireAtts.length; i++) {
           var wireAtt = wireAtts[i], bodyAtt = req.body.attachments[i];
           bodyAtt.sizeEstimateInBytes = wireAtt.sizeEstimate;
@@ -2504,7 +2539,7 @@ MailAPI.prototype = {
     req.composer.cc = msg.cc;
     req.composer.bcc = msg.bcc;
     req.composer._references = msg.referencesStr;
-    // XXX attachments
+    req.composer.attachments = msg.attachments;
 
     if (req.callback) {
       var callback = req.callback;
@@ -2545,7 +2580,9 @@ MailAPI.prototype = {
       unexpectedBridgeDataError('Bad handle for sent:', msg.handle);
       return;
     }
-    delete this._pendingRequests[msg.handle];
+    // Only delete the request if the send succeeded.
+    if (!msg.err)
+      delete this._pendingRequests[msg.handle];
     if (req.callback) {
       req.callback.call(null, msg.err, msg.badAddresses, msg.sentDate);
       req.callback = null;
@@ -11206,17 +11243,6 @@ function stashLinks(node, lowerTag) {
   }
 }
 
-var BLEACH_SETTINGS = {
-  tags: LEGAL_TAGS,
-  strip: true,
-  prune: PRUNE_TAGS,
-  attributes: LEGAL_ATTR_MAP,
-  styles: LEGAL_STYLES,
-  asNode: true,
-  callbackRegexp: RE_NODE_NEEDS_TRANSFORM,
-  callback: stashLinks
-};
-
 /**
  * @args[
  *   @param[htmlString String]{
@@ -11228,13 +11254,39 @@ var BLEACH_SETTINGS = {
  *     now we don't.  This is consistent with many webmail clients who ignore
  *     style tags in the head, etc.
  *   }
+ *   @param[callback @func[
+ *     @args[
+ *       @param[node DomNode]
+ *       @param[lowerTag String]
+ *     ]
+ *     An optional callback function to be called before stashLinks.  Return
+ *     true to skip stashLinks for this node, or false to call stashLinks.
+ *   }
  * ]
  * @return[HtmlElement]{
  *   The sanitized HTML content wrapped in a div container.
  * }
  */
-exports.sanitizeAndNormalizeHtml = function sanitizeAndNormalize(htmlString) {
-  var sanitizedNode = $bleach.clean(htmlString, BLEACH_SETTINGS);
+exports.sanitizeAndNormalizeHtml = function sanitizeAndNormalize(htmlString,
+                                                                 callback) {
+  var settings = {
+    tags: LEGAL_TAGS,
+    strip: true,
+    prune: PRUNE_TAGS,
+    attributes: LEGAL_ATTR_MAP,
+    styles: LEGAL_STYLES,
+    asNode: true,
+    callbackRegexp: RE_NODE_NEEDS_TRANSFORM,
+    callback: stashLinks
+  };
+  if (callback) {
+    settings.callback = function(node, lowerTag) {
+      if (!callback(node, lowerTag))
+        stashLinks(node, lowerTag);
+    }
+  }
+
+  var sanitizedNode = $bleach.clean(htmlString, settings);
   return sanitizedNode;
 };
 
@@ -12257,6 +12309,7 @@ console.log('done proc modifyConfig');
               cc: rCc,
               bcc: rBcc,
               referencesStr: referencesStr,
+              attachments: [],
             });
           }
           else {
@@ -12278,6 +12331,7 @@ console.log('done proc modifyConfig');
               // they came from, but with an extra header so that it was
               // possible to detect it was a forward.
               references: null,
+              attachments: [],
             });
           }
         });
@@ -12294,6 +12348,7 @@ console.log('done proc modifyConfig');
       cc: [],
       bcc: [],
       references: null,
+      attachments: [],
     });
   },
 
@@ -12351,18 +12406,46 @@ console.log('done proc modifyConfig');
     if (wireRep.references)
       composer.addHeader('References', wireRep.references);
 
+
     if (msg.command === 'send') {
-      var self = this;
-      account.sendMessage(composer, function(err, badAddresses) {
-        self.__sendMessage({
-          type: 'sent',
-          handle: msg.handle,
-          err: err,
-          badAddresses: badAddresses,
-          messageId: messageId,
-          sentDate: sentDate.valueOf(),
+      var self = this, asyncPending = 0;
+
+      if (wireRep.attachments) {
+        wireRep.attachments.forEach(function(attachmentDef) {
+          var reader = new FileReader();
+          reader.onload = function onloaded() {
+            composer.addAttachment({
+              filename: attachmentDef.name,
+              contentType: attachmentDef.blob.type,
+              contents: new Uint8Array(reader.result),
+            });
+            if (--asyncPending === 0)
+              initiateSend();
+          };
+          try {
+            reader.readAsArrayBuffer(attachmentDef.blob);
+            asyncPending++;
+          }
+          catch (ex) {
+            console.error('Problem attaching attachment:', ex, '\n', ex.stack);
+          }
         });
-      });
+      }
+
+      var initiateSend = function() {
+        account.sendMessage(composer, function(err, badAddresses) {
+          self.__sendMessage({
+            type: 'sent',
+            handle: msg.handle,
+            err: err,
+            badAddresses: badAddresses,
+            messageId: messageId,
+            sentDate: sentDate.valueOf(),
+          });
+        });
+      };
+      if (asyncPending === 0)
+        initiateSend();
     }
     else { // (msg.command === draft)
       // XXX save drafts!
@@ -13058,6 +13141,14 @@ exports.USE_KNOWN_DATE_RANGE_TIME_THRESH_NON_INBOX = 7 * $date.DAY_MILLIS;
 exports.USE_KNOWN_DATE_RANGE_TIME_THRESH_INBOX = 6 * $date.HOUR_MILLIS;
 
 ////////////////////////////////////////////////////////////////////////////////
+// General Sync Constants
+
+/**
+ * How frequently do we want to automatically synchronize our folder list?
+ * Currently, we think that once a day is sufficient.  This is a lower bound,
+ * we may sync less frequently than this.
+ */
+exports.SYNC_FOLDER_LIST_EVERY_MS = $date.DAY_MILLIS;
 
 /**
  * How many messages should we send to the UI in the first go?
@@ -13233,10 +13324,9 @@ else {
  *
  * Explanation of most recent bump:
  *
- * Bumping to 12 because IMAP is changing to issue its own suid's and store the
- * server suid separately.
+ * Bumping to 14 because we now support (require, really) HTML in ActiveSync
  */
-const CUR_VERSION = 12;
+const CUR_VERSION = exports.CUR_VERSION = 14;
 
 /**
  * What is the lowest database version that we are capable of performing a
@@ -13334,8 +13424,26 @@ const TBL_BODY_BLOCKS = 'bodyBlocks';
  * a blob for non-binary data that exceeds 64k by a fair margin, and less
  * compressible binary data that is at least 64k.
  *
+ * @args[
+ *   @param[testOptions #:optional @dict[
+ *     @key[dbVersion #:optional Number]{
+ *       Override the database version to treat as the database version to use.
+ *       This is intended to let us do simple database migration testing by
+ *       creating the database with an old version number, then re-open it
+ *       with the current version and seeing a migration happen.  To test
+ *       more authentic migrations when things get more complex, we will
+ *       probably want to persist JSON blobs to disk of actual older versions
+ *       and then pass that in to populate the database.
+ *     }
+ *     @key[nukeDb #:optional Boolean]{
+ *       Compel ourselves to nuke the previous database state and start from
+ *       scratch.  This only has an effect when IndexedDB has fired an
+ *       onupgradeneeded event.
+ *     }
+ *   ]]
+ * ]
  */
-function MailDB() {
+function MailDB(testOptions) {
   this._db = null;
   this._onDB = [];
 
@@ -13374,7 +13482,10 @@ function MailDB() {
                   explainedSource);
   };
 
-  var openRequest = IndexedDB.open('b2g-email', CUR_VERSION), self = this;
+  var dbVersion = CUR_VERSION;
+  if (testOptions && testOptions.dbVersion)
+    dbVersion = testOptions.dbVersion;
+  var openRequest = IndexedDB.open('b2g-email', dbVersion), self = this;
   openRequest.onsuccess = function(event) {
     self._db = openRequest.result;
     for (var i = 0; i < self._onDB.length; i++) {
@@ -13385,8 +13496,13 @@ function MailDB() {
   openRequest.onupgradeneeded = function(event) {
     var db = openRequest.result;
 
-    // friendly, lazy upgrade:
-    if (event.oldVersion >= FRIENDLY_LAZY_DB_UPGRADE_VERSION) {
+    // - reset to clean slate
+    if ((event.oldVersion < FRIENDLY_LAZY_DB_UPGRADE_VERSION) ||
+        (testOptions && testOptions.nukeDb)) {
+      self._nukeDB(db);
+    }
+    // - friendly, lazy upgrade
+    else {
       var trans = openRequest.transaction;
       // Load the current config, save it off so getConfig can use it, then nuke
       // like usual.  This is obviously a potentially data-lossy approach to
@@ -13401,10 +13517,6 @@ function MailDB() {
           };
         self._nukeDB(db);
       }, trans);
-    }
-    // - reset to clean slate
-    else {
-      self._nukeDB(db);
     }
   };
   openRequest.onerror = this._fatalError;
@@ -18126,6 +18238,7 @@ var getTZOffset = exports.getTZOffset = function getTZOffset(conn, callback) {
     conn.search([['UID', Math.max(1, highUid - 49) + ':' + highUid]],
                 gotSearch.bind(null, highUid - 50));
   }
+  var viableUids = null;
   function gotSearch(nextHighUid, err, uids) {
     if (!uids.length) {
       if (nextHighUid < 0) {
@@ -18134,7 +18247,8 @@ var getTZOffset = exports.getTZOffset = function getTZOffset(conn, callback) {
       }
       searchRange(nextHighUid);
     }
-    useUid(uids[uids.length - 1]);
+    viableUids = uids;
+    useUid(viableUids.pop());
   }
   function useUid(uid) {
     var fetcher = conn.fetch(
@@ -18164,6 +18278,13 @@ var getTZOffset = exports.getTZOffset = function getTZOffset(conn, callback) {
                 return;
               }
             }
+            // If we are here, the message somehow did not have a Received
+            // header.  Try again with another known UID or fail out if we
+            // have run out of UIDs.
+            if (viableUids.length)
+              useUid(viableUids.pop());
+            else // fail to the default.
+              callback(null, DEFAULT_TZ_OFFSET);
           });
       });
     fetcher.on('error', function onFetchErr(err) {
@@ -21753,6 +21874,9 @@ SmtpProber.prototype = {
         aCallback(new Error('Error getting OPTIONS URL'));
       };
 
+      // Set the response type to "text" so that we don't try to parse an empty
+      // body as XML.
+      xhr.responseType = 'text';
       xhr.send();
     },
 
@@ -21964,15 +22088,22 @@ exports.runOp = function runOp(op, mode, callback) {
   }
 
   this._LOG.runOp_begin(mode, op.type, null, op);
-  this._jobDriver[methodName](op, function(error, resultIfAny,
-                                           accountSaveSuggested) {
-    self._jobDriver.postJobCleanup(!error);
-    self._LOG.runOp_end(mode, op.type, error, op);
-    // defer the callback to the next tick to avoid deep recursion
-    window.setZeroTimeout(function() {
-      callback(error, resultIfAny, accountSaveSuggested);
+  // _LOG supports wrapping calls, but we want to be able to strip out all
+  // logging, and that wouldn't work.
+  try {
+    this._jobDriver[methodName](op, function(error, resultIfAny,
+                                             accountSaveSuggested) {
+      self._jobDriver.postJobCleanup(!error);
+      self._LOG.runOp_end(mode, op.type, error, op);
+      // defer the callback to the next tick to avoid deep recursion
+      window.setZeroTimeout(function() {
+        callback(error, resultIfAny, accountSaveSuggested);
+      });
     });
-  });
+  }
+  catch (ex) {
+    this._LOG.opError(mode, op.type, ex);
+  }
 };
 
 
@@ -22376,6 +22507,14 @@ function MailSlice(bridgeHandle, storage, _parentLog) {
    * in this.headers.
    */
   this._accumulating = false;
+  /**
+   * If true, don't add any headers.  This is used by ActiveSync during its
+   * synchronization step to wait until all headers have been retrieved and
+   * then the slice is populated from the database.  After this initial sync,
+   * ignoreHeaders is set to false so that updates and (hopefully small
+   * numbers of) additions/removals can be observed.
+   */
+  this.ignoreHeaders = false;
 
   /**
    * @listof[HeaderInfo]
@@ -22849,8 +22988,11 @@ MailSlice.prototype = {
  * ]]
  * @typedef[AttachmentInfo @dict[
  *   @key[name String]{
- *     The filename of the attachment if this is an attachment, the content-id
- *     of the attachment if this is a related part for inline display.
+ *     The filename of the attachment, if any.
+ *   }
+ *   @key[contentId String]{
+ *     The content-id of the attachment if this is a related part for inline
+ *     display.
  *   }
  *   @key[type String]{
  *     The (full) mime-type of the attachment.
@@ -23077,6 +23219,27 @@ FolderStorage.prototype = {
    */
   get syncInProgress() {
     return this._curSyncSlice !== null;
+  },
+
+  get hasActiveSlices() {
+    return this._slices.length > 0;
+  },
+
+  /**
+   * Reset all active slices.
+   */
+  resetAndRefreshActiveSlices: function() {
+    if (!this._slices.length)
+      return;
+    // This will splice out slices as we go, so work from the back to avoid
+    // processing any slice more than once.  (Shuffling of processed slices
+    // will occur, but we don't care.)
+    for (var i = this._slices.length - 1; i >= 0; i--) {
+      var slice = this._slices[i];
+      slice._resetHeadersBecauseOfRefreshExplosion();
+      slice.desiredHeaders = $sync.INITIAL_FILL_SIZE;
+      this._resetAndResyncSlice(slice, false);
+    }
   },
 
   generatePersistenceInfo: function() {
@@ -23949,8 +24112,10 @@ FolderStorage.prototype = {
       this._curSyncSlice = slice;
     }).bind(this);
 
-    // If we're offline, there's nothing to look into; use the DB.
-    if (!this._account.universe.online) {
+    // If we're offline or the folder can't be synchronized right now, then
+    // there's nothing to look into; use the DB.
+    if (!this._account.universe.online ||
+        !this.folderSyncer.syncable) {
       existingDataGood = true;
     }
     else if (this._accuracyRanges.length && !forceDeepening) {
@@ -23996,7 +24161,9 @@ FolderStorage.prototype = {
       this.getMessagesInImapDateRange(
         0, FUTURE(), $sync.INITIAL_FILL_SIZE, $sync.INITIAL_FILL_SIZE,
         // trigger a refresh if we are online
-        this.onFetchDBHeaders.bind(this, slice, this._account.universe.online)
+        this.onFetchDBHeaders.bind(
+          this, slice,
+          this._account.universe.online && this.folderSyncer.syncable)
       );
       return;
     }
@@ -24149,13 +24316,12 @@ FolderStorage.prototype = {
       // instead we need to retract all known messages and instead convert
       // this into a synchronization.
       if (bisectInfo) {
-        if (bisectInfo === 'aborted') {
-          self._slices.splice(self._slices.indexOf(slice), 1);
-          self.sliceOpenFromNow(slice, null, true);
-        }
-        else {
+        // (The first time through bisectInfo is an object; we return 'abort'
+        // and then get called again with 'aborted'...)
+        if (bisectInfo === 'aborted')
+          self._resetAndResyncSlice(slice, true);
+        else
           slice._resetHeadersBecauseOfRefreshExplosion();
-        }
         return 'abort';
       }
 
@@ -24166,6 +24332,11 @@ FolderStorage.prototype = {
       slice.setStatus('synced', true, false);
       return undefined;
     });
+  },
+
+  _resetAndResyncSlice: function(slice, forceDeepening) {
+    this._slices.splice(this._slices.indexOf(slice), 1);
+    this.sliceOpenFromNow(slice, null, forceDeepening);
   },
 
   dyingSlice: function ifs_dyingSlice(slice) {
@@ -24181,8 +24352,6 @@ FolderStorage.prototype = {
    */
   onFetchDBHeaders: function(slice, triggerRefresh,
                              headers, moreMessagesComing) {
-    slice.atBottom = this.headerIsOldestKnown(slice.endTS, slice.endUID);
-
     var triggerNow = false;
     if (!moreMessagesComing && triggerRefresh) {
       moreMessagesComing = true;
@@ -24190,7 +24359,9 @@ FolderStorage.prototype = {
     }
 
     if (headers.length) {
-      slice.batchAppendHeaders(headers, -1, moreMessagesComing);
+      // Claim there are more headers coming since we will trigger setStatus
+      // right below and we want that to be the only edge transition.
+      slice.batchAppendHeaders(headers, -1, true);
     }
 
     if (!moreMessagesComing) {
@@ -25257,6 +25428,31 @@ define('mailapi/searchfilter',
   ) {
 
 /**
+ * This internal function checks if a string or a regexp matches an input
+ * and if it does, it returns a 'return value' as RegExp.exec does.  Note that
+ * the 'index' of the returned value will be relative to the provided
+ * `fromIndex` as if the string had been sliced using fromIndex.
+ */
+function matchRegexpOrString(phrase, input, fromIndex) {
+  if (!input) {
+    return null;
+  }
+
+  if (phrase instanceof RegExp) {
+    return phrase.exec(fromIndex ? input.slice(fromIndex) : input);
+  }
+
+  var idx = input.indexOf(phrase, fromIndex);
+  if (idx == -1) {
+    return null;
+  }
+
+  var ret = [ phrase ];
+  ret.index = idx - fromIndex;
+  return ret;
+}
+
+/**
  * Match a single phrase against the author's display name or e-mail address.
  * Match results are stored in the 'author' attribute of the match object as a
  * `FilterMatchItem`.
@@ -25271,21 +25467,21 @@ AuthorFilter.prototype = {
   needsBody: false,
 
   testMessage: function(header, body, match) {
-    var author = header.author, phrase = this.phrase, idx;
-    if (author.name && (idx = author.name.indexOf(phrase)) !== -1) {
+    var author = header.author, phrase = this.phrase, ret;
+    if ((ret = matchRegexpOrString(phrase, author.name, 0))) {
       match.author = {
         text: author.name,
         offset: 0,
-        matchRuns: [{ start: idx, length: phrase.length }],
+        matchRuns: [{ start: ret.index, length: ret[0].length }],
         path: null,
       };
       return true;
     }
-    if (author.address && (idx = author.address.indexOf(phrase)) !== -1) {
+    if ((ret = matchRegexpOrString(phrase, author.address, 0))) {
       match.author = {
         text: author.address,
         offset: 0,
-        matchRuns: [{ start: idx, length: phrase.length }],
+        matchRuns: [{ start: ret.index, length: ret[0].length }],
         path: null,
       };
       return true;
@@ -25322,25 +25518,25 @@ RecipientFilter.prototype = {
     const phrase = this.phrase, stopAfter = this.stopAfter;
     var matches = [];
     function checkRecipList(list) {
-      var idx;
+      var ret;
       for (var i = 0; i < list.length; i++) {
         var recip = list[i];
-        if (recip.name && (idx = recip.name.indexOf(phrase)) !== -1) {
+        if ((ret = matchRegexpOrString(phrase, recip.name, 0))) {
           matches.push({
             text: recip.name,
             offset: 0,
-            matchRuns: [{ start: idx, length: phrase.length }],
+            matchRuns: [{ start: ret.index, length: ret[0].length }],
             path: null,
           });
           if (matches.length < stopAfter)
             continue;
           return;
         }
-        if (recip.address && (idx = recip.address.indexOf(phrase)) !== -1) {
+        if ((ret = matchRegexpOrString(phrase, recip.address, 0))) {
           matches.push({
             text: recip.address,
             offset: 0,
-            matchRuns: [{ start: idx, length: phrase.length }],
+            matchRuns: [{ start: ret.index, length: ret[0].length }],
             path: null,
           });
           if (matches.length >= stopAfter)
@@ -25388,6 +25584,8 @@ function snippetMatchHelper(str, start, length, contextBefore, contextAfter,
   if (contextBefore > start)
     contextBefore = start;
   var offset = str.indexOf(' ', start - contextBefore);
+  if (offset === -1)
+    offset = 0;
   if (offset >= start)
     offset = start - contextBefore;
   var endIdx = str.lastIndexOf(' ', start + length + contextAfter);
@@ -25418,11 +25616,11 @@ function SubjectFilter(phrase, stopAfterNMatches, contextBefore, contextAfter) {
   this.contextBefore = contextBefore;
   this.contextAfter = contextAfter;
 }
-exports.Subjectfilter = SubjectFilter;
+exports.SubjectFilter = SubjectFilter;
 SubjectFilter.prototype = {
   needsBody: false,
   testMessage: function(header, body, match) {
-    const phrase = this.phrase, phrlen = phrase.length,
+    const phrase = this.phrase,
           subject = header.subject, slen = subject.length,
           stopAfter = this.stopAfter,
           contextBefore = this.contextBefore, contextAfter = this.contextAfter,
@@ -25430,13 +25628,13 @@ SubjectFilter.prototype = {
     var idx = 0;
 
     while (idx < slen && matches.length < stopAfter) {
-      idx = subject.indexOf(phrase, idx);
-      if (idx === -1)
+      var ret = matchRegexpOrString(phrase, subject, idx);
+      if (!ret)
         break;
 
-      matches.push(snippetMatchHelper(subject, idx, phrlen,
+      matches.push(snippetMatchHelper(subject, idx + ret.index, ret[0].length,
                                       contextBefore, contextAfter, null));
-      idx += phrlen;
+      idx += ret.index + ret[0].length;
     }
 
     if (matches.length) {
@@ -25476,7 +25674,7 @@ exports.BodyFilter = BodyFilter;
 BodyFilter.prototype = {
   needsBody: true,
   testMessage: function(header, body, match) {
-    const phrase = this.phrase, phrlen = phrase.length,
+    const phrase = this.phrase,
           stopAfter = this.stopAfter,
           contextBefore = this.contextBefore, contextAfter = this.contextAfter,
           matches = [],
@@ -25499,15 +25697,15 @@ BodyFilter.prototype = {
             continue;
 
           for (idx = 0; idx < block.length && matches.length < stopAfter;) {
-            idx = block.indexOf(phrase, idx);
-            if (idx === -1)
+            var ret = matchRegexpOrString(phrase, block, idx);
+            if (!ret)
               break;
             if (repPath === null)
               repPath = [iBodyRep, iRep];
-            matches.push(snippetMatchHelper(block, idx, phrlen,
+            matches.push(snippetMatchHelper(block, ret.index, ret[0].length,
                                             contextBefore, contextAfter,
                                             repPath));
-            idx += phrlen;
+            idx += ret.index + ret[0].length;
           }
         }
       }
@@ -25552,10 +25750,10 @@ BodyFilter.prototype = {
             // worry about it.
             var nodeText = node.data;
 
-            idx = nodeText.indexOf(phrase);
-            if (idx !== -1) {
+            var ret = matchRegexpOrString(phrase, nodeText, 0);
+            if (ret) {
               matches.push(
-                snippetMatchHelper(nodeText, idx, phrlen,
+                snippetMatchHelper(nodeText, ret.index, ret[0].length,
                                    contextBefore, contextAfter,
                                    htmlPath.concat()));
               if (matches.length >= stopAfter)
@@ -25603,7 +25801,6 @@ function MessageFilterer(filters) {
     if (filter.needsBody)
       this.bodiesNeeded = true;
   }
-console.log('sf: filterer: bodiesNeeded:', this.bodiesNeeded);
 }
 exports.MessageFilterer = MessageFilterer;
 MessageFilterer.prototype = {
@@ -25613,8 +25810,8 @@ MessageFilterer.prototype = {
    * are defined by the filterers in use.
    */
   testMessage: function(header, body) {
-console.log('sf: testMessage(', header.suid, header.author.address,
-            header.subject, 'body?', !!body, ')');
+    //console.log('sf: testMessage(', header.suid, header.author.address,
+    //            header.subject, 'body?', !!body, ')');
     var matched = false, matchObj = {};
     const filters = this.filters;
     for (var i = 0; i < filters.length; i++) {
@@ -25622,7 +25819,7 @@ console.log('sf: testMessage(', header.suid, header.author.address,
       if (filter.testMessage(header, body, matchObj))
         matched = true;
     }
-console.log('   =>', matched, JSON.stringify(matchObj));
+    //console.log('   =>', matched, JSON.stringify(matchObj));
     if (matched)
       return matchObj;
     else
@@ -25653,6 +25850,12 @@ console.log('sf: creating SearchSlice:', phrase);
   this.startUID = null;
   this.endTS = null;
   this.endUID = null;
+
+  if (!(phrase instanceof RegExp)) {
+    phrase = new RegExp(phrase.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g,
+                                       '\\$&'),
+                        'i');
+  }
 
   var filters = [];
   if (whatToSearch.author)
@@ -26013,13 +26216,10 @@ exports.chewHeaderAndBodyStructure = function chewStructure(msg) {
       return s;
     }
 
-    // - Attachments have names and don't have id's for multipart/related
-    if (disposition === 'attachment') {
-      // We probably want to do a MIME mapping here for the extension?
-      if (!filename)
-        filename = 'unnamed-' + (++unnamedPartCounter);
-      attachments.push({
-        name: filename,
+    function makePart(partInfo, filename) {
+      return {
+        name: filename || 'unnamed-' + (++unnamedPartCounter),
+        contentId: partInfo.id ? stripArrows(partInfo.id) : null,
         type: (partInfo.type + '/' + partInfo.subtype).toLowerCase(),
         part: partInfo.partID,
         encoding: partInfo.encoding && partInfo.encoding.toLowerCase(),
@@ -26031,32 +26231,21 @@ exports.chewHeaderAndBodyStructure = function chewStructure(msg) {
         textFormat: (partInfo.params && partInfo.params.format &&
                      partInfo.params.format.toLowerCase()) || undefined
          */
-      });
-      return true;
+      };
     }
-    // (must be inline)
 
-    //
-    if (partInfo.type === 'image') {
-      relatedParts.push({
-        name: stripArrows(partInfo.id), // this is the cid
-        type: (partInfo.type + '/' + partInfo.subtype).toLowerCase(),
-        part: partInfo.partID,
-        encoding: partInfo.encoding && partInfo.encoding.toLowerCase(),
-        sizeEstimate: estimatePartSizeInBytes(partInfo),
-        file: null,
-        /*
-        charset: (partInfo.params && partInfo.params.charset &&
-                  partInfo.params.charset.toLowerCase()) || undefined,
-        textFormat: (partInfo.params && partInfo.params.format &&
-                     partInfo.params.format.toLowerCase()) || undefined
-         */
-      });
+    if (disposition === 'attachment') {
+      attachments.push(makePart(partInfo, filename));
       return true;
     }
 
     // - We must be an inline part or structure
     switch (partInfo.type) {
+      // - related image
+      case 'image':
+        relatedParts.push(makePart(partInfo, filename));
+        return true;
+        break;
       // - content
       case 'text':
         if (partInfo.subtype === 'plain' ||
@@ -26933,7 +27122,7 @@ console.warn('  FLAGS: "' + header.flags.toString() + '" VS "' +
     }
   },
 
-  downloadMessageAttachments: function(uid, partInfos, callback) {
+  downloadMessageAttachments: function(uid, partInfos, callback, progress) {
     var conn = this._conn;
     var mparser = new $mailparser.MailParser();
 
@@ -26994,7 +27183,7 @@ console.warn('  FLAGS: "' + header.flags.toString() + '" VS "' +
         setupBodyParser(partInfo);
         msg.on('data', bodyParseBuffer);
         msg.on('end', function() {
-          bodies.push(finishBodyParsing());
+          bodies.push(new Blob([finishBodyParsing()], { type: partInfo.type }));
 
           if (--pendingFetches === 0)
             callback(anyError, bodies);
@@ -27042,6 +27231,12 @@ function ImapFolderSyncer(account, folderStorage, _parentLog) {
 }
 exports.ImapFolderSyncer = ImapFolderSyncer;
 ImapFolderSyncer.prototype = {
+  /**
+   * Although we do have some errbackoff stuff we do, we can always try to
+   * synchronize.  The errbackoff is just a question of when we will retry.
+   */
+  syncable: true,
+
   syncDateRange: function(startTS, endTS, syncCallback) {
     syncCallback('sync', false);
     this._startSync(startTS, endTS);
@@ -27522,6 +27717,138 @@ exports.local_undo_delete = function(op, doneCallback) {
   this.local_undo_move(op, doneCallback, trashFolder.id);
 };
 
+exports.do_download = function(op, callback) {
+  var self = this;
+  var idxLastSlash = op.messageSuid.lastIndexOf('/'),
+      folderId = op.messageSuid.substring(0, idxLastSlash);
+
+  var folderConn, folderStorage;
+  // Once we have the connection, get the current state of the body rep.
+  var gotConn = function gotConn(_folderConn, _folderStorage) {
+    folderConn = _folderConn;
+    folderStorage = _folderStorage;
+
+    folderStorage.getMessageHeader(op.messageSuid, op.messageDate, gotHeader);
+  };
+  var deadConn = function deadConn() {
+    callback('aborted-retry');
+  };
+  // Now that we have the body, we can know the part numbers and eliminate /
+  // filter out any redundant download requests.  Issue all the fetches at
+  // once.
+  var partsToDownload = [], storePartsTo = [], header, bodyInfo, uid;
+  var gotHeader = function gotHeader(_headerInfo) {
+    header = _headerInfo;
+    uid = header.srvid;
+    folderStorage.getMessageBody(op.messageSuid, op.messageDate, gotBody);
+  };
+  var gotBody = function gotBody(_bodyInfo) {
+    bodyInfo = _bodyInfo;
+    var i, partInfo;
+    for (i = 0; i < op.relPartIndices.length; i++) {
+      partInfo = bodyInfo.relatedParts[op.relPartIndices[i]];
+      if (partInfo.file)
+        continue;
+      partsToDownload.push(partInfo);
+      storePartsTo.push('idb');
+    }
+    for (i = 0; i < op.attachmentIndices.length; i++) {
+      partInfo = bodyInfo.attachments[op.attachmentIndices[i]];
+      if (partInfo.file)
+        continue;
+      partsToDownload.push(partInfo);
+      // right now all attachments go in pictures
+      storePartsTo.push('pictures');
+    }
+
+    folderConn.downloadMessageAttachments(uid, partsToDownload, gotParts);
+  };
+  var pendingStorageWrites = 0, downloadErr = null;
+  /**
+   * Save an attachment to device storage, making the filename unique if we
+   * encounter a collision.
+   */
+  function saveToStorage(blob, storage, filename, partInfo, isRetry) {
+    pendingStorageWrites++;
+    var dstorage = navigator.getDeviceStorage(storage);
+    var req = dstorage.addNamed(blob, filename);
+    req.onerror = function() {
+      console.warn('failed to save attachment to', storage, filename,
+                   'type:', blob.type);
+      pendingStorageWrites--;
+      // if we failed to unique the file after appending junk, just give up
+      if (isRetry) {
+        if (pendingStorageWrites === 0)
+          done();
+        return;
+      }
+      // retry by appending a super huge timestamp to the file before its
+      // extension.
+      var idxLastPeriod = filename.lastIndexOf('.');
+      if (idxLastPeriod === -1)
+        idxLastPeriod = filename.length;
+      filename = filename.substring(0, idxLastPeriod) + '-' + Date.now() +
+                   filename.substring(idxLastPeriod);
+      saveToStorage(blob, storage, filename, partInfo, true);
+    };
+    req.onsuccess = function() {
+      console.log('saved attachment to', storage, filename, 'type:', blob.type);
+      partInfo.file = [storage, filename];
+      if (--pendingStorageWrites === 0)
+        done();
+    };
+  }
+  var gotParts = function gotParts(err, bodyBlobs) {
+    if (bodyBlobs.length !== partsToDownload.length) {
+      callback(err, null, false);
+      return;
+    }
+    downloadErr = err;
+    for (var i = 0; i < partsToDownload.length; i++) {
+      // Because we should be under a mutex, this part should still be the
+      // live representation and we can mutate it.
+      var partInfo = partsToDownload[i],
+          blob = bodyBlobs[i],
+          storeTo = storePartsTo[i];
+
+      if (blob) {
+        partInfo.sizeEstimate = blob.length;
+        partInfo.type = blob.type;
+        if (storeTo === 'idb')
+          partInfo.file = blob;
+        else
+          saveToStorage(blob, storeTo, partInfo.name, partInfo);
+      }
+    }
+    if (!pendingStorageWrites)
+      done();
+  };
+  function done() {
+    folderStorage.updateMessageBody(op.messageSuid, op.messageDate, bodyInfo);
+    callback(downloadErr, bodyInfo, true);
+  };
+
+  self._accessFolderForMutation(folderId, true, gotConn, deadConn,
+                                'download');
+};
+
+exports.local_do_download = function(op, callback) {
+  // Downloads are inherently online operations.
+  callback(null);
+};
+
+exports.check_download = function(op, callback) {
+  // If we had download the file and persisted it successfully, this job would
+  // be marked done because of the atomicity guarantee on our commits.
+  callback(null, 'coherent-notyet');
+};
+exports.local_undo_download = function(op, callback) {
+  callback(null);
+};
+exports.undo_download = function(op, callback) {
+  callback(null);
+};
+
 exports.postJobCleanup = function(passed) {
   if (passed) {
     var deltaMap, fullMap;
@@ -27968,91 +28295,15 @@ ImapJobDriver.prototype = {
   //////////////////////////////////////////////////////////////////////////////
   // download: Download one or more attachments from a single message
 
-  local_do_download: function(op, callback) {
-    // Downloads are inherently online operations.
-    callback(null);
-  },
+  local_do_download: $jobmixins.local_do_download,
 
-  do_download: function(op, callback) {
-    var self = this;
-    var idxLastSlash = op.messageSuid.lastIndexOf('/'),
-        folderId = op.messageSuid.substring(0, idxLastSlash);
+  do_download: $jobmixins.do_download,
 
-    var folderConn, folderStorage;
-    // Once we have the connection, get the current state of the body rep.
-    var gotConn = function gotConn(_folderConn, _folderStorage) {
-      folderConn = _folderConn;
-      folderStorage = _folderStorage;
+  check_download: $jobmixins.check_download,
 
-      folderStorage.getMessageHeader(op.messageSuid, op.messageDate, gotHeader);
-    };
-    var deadConn = function deadConn() {
-      callback('aborted-retry');
-    };
-    // Now that we have the body, we can know the part numbers and eliminate /
-    // filter out any redundant download requests.  Issue all the fetches at
-    // once.
-    var partsToDownload = [], header, bodyInfo, uid;
-    var gotHeader = function gotHeader(_headerInfo) {
-      header = _headerInfo;
-      uid = header.srvid;
-      folderStorage.getMessageBody(op.messageSuid, op.messageDate, gotBody);
-    };
-    var gotBody = function gotBody(_bodyInfo) {
-      bodyInfo = _bodyInfo;
-      var i, partInfo;
-      for (i = 0; i < op.relPartIndices.length; i++) {
-        partInfo = bodyInfo.relatedParts[op.relPartIndices[i]];
-        if (partInfo.file)
-          continue;
-        partsToDownload.push(partInfo);
-      }
-      for (i = 0; i < op.attachmentIndices.length; i++) {
-        partInfo = bodyInfo.attachments[op.attachmentIndices[i]];
-        if (partInfo.file)
-          continue;
-        partsToDownload.push(partInfo);
-      }
+  local_undo_download: $jobmixins.local_undo_download,
 
-      folderConn.downloadMessageAttachments(uid, partsToDownload, gotParts);
-    };
-    var gotParts = function gotParts(err, bodyBuffers) {
-      if (bodyBuffers.length !== partsToDownload.length) {
-        callback(err, null, false);
-        return;
-      }
-      for (var i = 0; i < partsToDownload.length; i++) {
-        // Because we should be under a mutex, this part should still be the
-        // live representation and we can mutate it.
-        var partInfo = partsToDownload[i],
-            buffer = bodyBuffers[i];
-
-        partInfo.sizeEstimate = buffer.length;
-        partInfo.file = new Blob([buffer],
-                                 { contentType: partInfo.type });
-      }
-      folderStorage.updateMessageBody(op.messageSuid, op.messageDate, bodyInfo);
-      callback(err, bodyInfo, true);
-    };
-
-    self._accessFolderForMutation(folderId, true, gotConn, deadConn,
-                                  'download');
-  },
-
-  check_download: function(op, callback) {
-    // If we had download the file and persisted it successfully, this job would
-    // be marked done because of the atomicity guarantee on our commits.
-    callback(null, UNCHECKED_COHERENT_NOTYET);
-  },
-
-  local_undo_download: function(op, callback) {
-    callback(null);
-  },
-
-  undo_download: function(op, callback) {
-    callback(null);
-  },
-
+  undo_download: $jobmixins.undo_download,
 
   //////////////////////////////////////////////////////////////////////////////
   // modtags: Modify tags on messages
@@ -28533,6 +28784,49 @@ ImapJobDriver.prototype = {
   },
 
   //////////////////////////////////////////////////////////////////////////////
+  // syncFolderList
+  //
+  // Synchronize our folder list.  This should always be an idempotent operation
+  // that makes no sense to undo/redo/etc.
+
+  local_do_syncFolderList: function(op, doneCallback) {
+    doneCallback(null);
+  },
+
+  do_syncFolderList: function(op, doneCallback) {
+    var account = this.account, reported = false;
+    this._acquireConnWithoutFolder(
+      'syncFolderList',
+      function gotConn(conn) {
+        account._syncFolderList(conn, function(err) {
+            if (!err)
+              account.meta.lastFolderSyncAt = Date.now();
+            // request an account save
+            if (!reported)
+              doneCallback(err ? 'aborted-retry' : null, null, !err);
+            reported = true;
+          });
+      },
+      function deadConn() {
+        if (!reported)
+          doneCallback('aborted-retry');
+        reported = true;
+      });
+  },
+
+  check_syncFolderList: function(op, doneCallback) {
+    doneCallback('idempotent');
+  },
+
+  local_undo_syncFolderList: function(op, doneCallback) {
+    doneCallback('moot');
+  },
+
+  undo_syncFolderList: function(op, doneCallback) {
+    doneCallback('moot');
+  },
+
+  //////////////////////////////////////////////////////////////////////////////
   // createFolder: Create a folder
 
   local_do_createFolder: function(op, doneCallback) {
@@ -28813,9 +29107,8 @@ function ImapAccount(universe, compositeAccount, accountId, credentials,
    *   @param[nextMutationNum Number]{
    *     The next mutation id to be allocated.
    *   }
-   *   @param[lastFullFolderProbeAt DateMS]{
-   *     When was the last time we went through our list of folders and got the
-   *     unread count in each folder.
+   *   @param[lastFolderSyncAt DateMS]{
+   *     When was the last time we ran `syncFolderList`?
    *   }
    *   @param[capability @listof[String]]{
    *     The post-login capabilities from the server.
@@ -28868,6 +29161,14 @@ function ImapAccount(universe, compositeAccount, accountId, credentials,
    * expunging deleted messages.
    */
   this._TEST_doNotCloseFolder = false;
+
+  // Ensure we have an inbox.  This is a folder that must exist with a standard
+  // name, so we can create it without talking to the server.
+  var inboxFolder = this.getFirstFolderWithType('inbox');
+  if (!inboxFolder) {
+    // XXX localized inbox string (bug 805834)
+    this._learnAboutFolder('INBOX', 'INBOX', 'inbox', '/', 0);
+  }
 }
 exports.ImapAccount = ImapAccount;
 ImapAccount.prototype = {
@@ -29334,11 +29635,13 @@ ImapAccount.prototype = {
   //////////////////////////////////////////////////////////////////////////////
   // Folder synchronization
 
-  syncFolderList: function(callback) {
-    var self = this;
-    this.__folderDemandsConnection(null, 'syncFolderList', function(conn) {
-      conn.getBoxes(self._syncFolderComputeDeltas.bind(self, conn, callback));
-    });
+  /**
+   * Helper in conjunction with `_syncFolderComputeDeltas` for use by the
+   * syncFolderList operation/job.  The op is on the hook for the connection's
+   * lifecycle.
+   */
+  _syncFolderList: function(conn, callback) {
+    conn.getBoxes(this._syncFolderComputeDeltas.bind(this, conn, callback));
   },
   _determineFolderType: function(box, path) {
     var type = null;
@@ -29433,9 +29736,7 @@ ImapAccount.prototype = {
   _syncFolderComputeDeltas: function(conn, callback, err, boxesRoot) {
     var self = this;
     if (err) {
-      // XXX need to deal with transient failure states
-      this.__folderDoneWithConnection(conn, false, false);
-      callback();
+      callback(err);
       return;
     }
 
@@ -29454,6 +29755,12 @@ ImapAccount.prototype = {
 
         // - already known folder
         if (folderPubsByPath.hasOwnProperty(path)) {
+          // Make sure the delimiter is up-to-date (for INBOX we initially make
+          // a guess which we must update here.)
+          var meta = folderPubsByPath[path];
+          if (meta.delim !== box.delim)
+            meta.delim = box.delim;
+
           // mark it with true to show that we've seen it.
           folderPubsByPath = true;
         }
@@ -29482,10 +29789,7 @@ ImapAccount.prototype = {
       this._forgetFolder(folderPub.id);
     }
 
-    this.__folderDoneWithConnection(conn, false, false);
-    // be sure to save our state now that we are up-to-date on this.
-    this.saveAccountState();
-    callback();
+    callback(null);
   },
 
   /**
@@ -29570,6 +29874,7 @@ var LOGFAB = exports.LOGFAB = $log.register($module, {
       unknownDeadConnection: {},
       connectionError: {},
       folderAlreadyHasConn: { folderId: false },
+      opError: { mode: false, type: false, ex: $log.EXCEPTION },
     },
     asyncJobs: {
       runOp: { mode: true, type: true, error: false, op: false },
@@ -29650,7 +29955,14 @@ SmtpAccount.prototype = {
    * message to the sent folder.
    *
    * @args[
-   *   @param[composedMessage]
+   *   @param[composedMessage MailComposer]{
+   *     A mailcomposer instance that has already generated its message payload
+   *     to its _outputBuffer field.  We previously used streaming generation,
+   *     but have abandoned this for now for IMAP Sent folder saving purposes.
+   *     Namely, our IMAP implementation doesn't support taking a stream for
+   *     APPEND right now, and there's no benefit to doing double the work and
+   *     generating extra garbage.
+   *   }
    *   @param[callback @func[
    *     @args[
    *       @param[error @oneof[
@@ -29710,8 +30022,8 @@ SmtpAccount.prototype = {
         if (bailed)
           return;
         sendingMessage = true;
-        composedMessage.streamMessage();
-        composedMessage.pipe(conn);
+        conn.write(composedMessage._outputBuffer);
+        conn.end();
       });
     // And close the connection and be done once it has been sent
     conn.on('ready', function() {
@@ -30337,8 +30649,9 @@ MessageGenerator.prototype = {
         args[propAttrName] = aSetDef[propAttrName];
     }
 
-    var count = aSetDef.count || this.MAKE_MESSAGES_DEFAULTS.count;
-    var messagsPerThread = aSetDef.msgsPerThread || 1;
+    var count = aSetDef.hasOwnProperty('count') ? aSetDef.count :
+                this.MAKE_MESSAGES_DEFAULTS.count;
+    var messagesPerThread = aSetDef.msgsPerThread || 1;
     var rawBodies = aSetDef.hasOwnProperty('rawBodies') ? aSetDef.rawBodies
                                                         : null,
         replaceHeaders = aSetDef.hasOwnProperty('replaceHeaders') ?
@@ -30347,7 +30660,7 @@ MessageGenerator.prototype = {
     var lastMessage = null;
     for (var iMsg = 0; iMsg < count; iMsg++) {
       // primitive threading support...
-      if (lastMessage && (iMsg % messagsPerThread != 0))
+      if (lastMessage && (iMsg % messagesPerThread != 0))
         args.inReplyTo = lastMessage;
       else if (!("inReplyTo" in aSetDef))
         args.inReplyTo = null;
@@ -30580,6 +30893,7 @@ define('mailapi/activesync/folder',
     'activesync/protocol',
     'mimelib',
     '../quotechew',
+    '../htmlchew',
     '../date',
     '../syncbase',
     '../util',
@@ -30593,6 +30907,7 @@ define('mailapi/activesync/folder',
     $activesync,
     $mimelib,
     $quotechew,
+    $htmlchew,
     $date,
     $sync,
     $util,
@@ -30606,15 +30921,14 @@ const DESIRED_SNIPPET_LENGTH = 100;
 const FILTER_TYPE = $ascp.AirSync.Enums.FilterType;
 
 // Map our built-in sync range values to their corresponding ActiveSync
-// FilterType values.
+// FilterType values. We exclude 3 and 6 months, since they aren't valid for
+// email.
 const SYNC_RANGE_TO_FILTER_TYPE = {
    '1d': FILTER_TYPE.OneDayBack,
    '3d': FILTER_TYPE.ThreeDaysBack,
    '1w': FILTER_TYPE.OneWeekBack,
    '2w': FILTER_TYPE.TwoWeeksBack,
    '1m': FILTER_TYPE.OneMonthBack,
-   '3m': FILTER_TYPE.ThreeMonthsBack,
-   '6m': FILTER_TYPE.SixMonthsBack,
   'all': FILTER_TYPE.NoFilter,
 };
 
@@ -30680,6 +30994,7 @@ ActiveSyncFolderConn.prototype = {
     account.conn.postCommand(w, function(aError, aResponse) {
       if (aError) {
         console.error(aError);
+        callback('unknown');
         return;
       }
 
@@ -30690,10 +31005,15 @@ ActiveSyncFolderConn.prototype = {
       });
       e.run(aResponse);
 
-      if (folderConn.syncKey === '0')
+      if (folderConn.syncKey === '0') {
+        // XXX we should re-sync the entire folder list from scratch and compute
+        // the deltas.
         console.error('Unable to get sync key for folder');
-      else
+        callback('unknown');
+      }
+      else {
         callback();
+      }
     });
   },
 
@@ -30751,9 +31071,12 @@ ActiveSyncFolderConn.prototype = {
              .stag(as.Options)
                .tag(as.FilterType, this.filterType)
 
+      // XXX: For some servers (e.g. Hotmail), we could be smart and get the
+      // native body type (plain text or HTML), but Gmail doesn't seem to let us
+      // do this. For now, let's keep it simple and always get HTML.
       if (account.conn.currentVersion.gte('12.0'))
               w.stag(asb.BodyPreference)
-                 .tag(asb.Type, asbEnum.Type.PlainText)
+                 .tag(asb.Type, asbEnum.Type.HTML)
                .etag();
 
               w.tag(as.MIMESupport, asEnum.MIMESupport.Never)
@@ -30877,8 +31200,10 @@ ActiveSyncFolderConn.prototype = {
    * @return {object} An object containing the header and body for the message
    */
   _parseMessage: function asfc__parseMessage(node, isAdded) {
-    const asb = $ascp.AirSyncBase.Tags;
     const em = $ascp.Email.Tags;
+    const asb = $ascp.AirSyncBase.Tags;
+    const asbEnum = $ascp.AirSyncBase.Enums;
+
     let header, body, flagHeader;
 
     if (isAdded) {
@@ -30903,6 +31228,7 @@ ActiveSyncFolderConn.prototype = {
         bcc: null,
         replyTo: null,
         attachments: [],
+        relatedParts: [],
         references: null,
         bodyReps: null,
       };
@@ -30953,9 +31279,11 @@ ActiveSyncFolderConn.prototype = {
       }
     }
 
+    let bodyType, bodyText;
+
     for (let [,child] in Iterator(node.children)) {
-      let childText = child.children.length &&
-                      child.children[0].textContent;
+      let childText = child.children.length ? child.children[0].textContent :
+                                              null;
 
       switch (child.tag) {
       case em.Subject:
@@ -30987,44 +31315,47 @@ ActiveSyncFolderConn.prototype = {
         break;
       case asb.Body: // ActiveSync 12.0+
         for (let [,grandchild] in Iterator(child.children)) {
-          if (grandchild.tag === asb.Data) {
-            body.bodyReps = [
-              'plain',
-              $quotechew.quoteProcessTextBody(
-                grandchild.children[0].textContent)
-            ];
-            header.snippet = $quotechew.generateSnippet(body.bodyReps[1],
-                                                        DESIRED_SNIPPET_LENGTH);
+          switch (grandchild.tag) {
+          case asb.Type:
+            bodyType = grandchild.children[0].textContent;
+            break;
+          case asb.Data:
+            bodyText = grandchild.children[0].textContent;
+            break;
           }
         }
         break;
       case em.Body: // pre-ActiveSync 12.0
-        body.bodyReps = [
-          'plain',
-          $quotechew.quoteProcessTextBody(childText)
-        ];
-        header.snippet = $quotechew.generateSnippet(body.bodyReps[1],
-                                                    DESIRED_SNIPPET_LENGTH);
+        bodyType = asbEnum.Type.PlainText;
+        bodyText = childText;
         break;
       case asb.Attachments: // ActiveSync 12.0+
       case em.Attachments:  // pre-ActiveSync 12.0
-        header.hasAttachments = true;
-        body.attachments = [];
         for (let [,attachmentNode] in Iterator(child.children)) {
           if (attachmentNode.tag !== asb.Attachment &&
               attachmentNode.tag !== em.Attachment)
             continue;
 
-          let attachment = { name: null, type: null, part: null,
-                             sizeEstimate: null };
+          let attachment = {
+            name: null,
+            contentId: null,
+            type: null,
+            part: null,
+            encoding: null,
+            sizeEstimate: null,
+            file: null,
+          };
 
+          let isInline = false;
           for (let [,attachData] in Iterator(attachmentNode.children)) {
             let dot, ext;
+            let attachDataText = attachData.children.length ?
+                                 attachData.children[0].textContent : null;
 
             switch (attachData.tag) {
             case asb.DisplayName:
             case em.DisplayName:
-              attachment.name = attachData.children[0].textContent;
+              attachment.name = attachDataText;
 
               // Get the file's extension to look up a mimetype, but ignore it
               // if the filename is of the form '.bashrc'.
@@ -31033,16 +31364,87 @@ ActiveSyncFolderConn.prototype = {
               attachment.type = $mimelib.contentTypes[ext] ||
                                 'application/octet-stream';
               break;
+            case asb.FileReference:
+            case em.AttName:
+              attachment.part = attachDataText;
+              break;
             case asb.EstimatedDataSize:
             case em.AttSize:
-              attachment.sizeEstimate = attachData.children[0].textContent;
+              attachment.sizeEstimate = parseInt(attachDataText);
+              break;
+            case asb.ContentId:
+              attachment.contentId = attachDataText;
+              break;
+            case asb.IsInline:
+              isInline = (attachDataText === '1');
+              break;
+            case asb.FileReference:
+            case em.Att0Id:
+              attachment.part = attachData.children[0].textContent;
               break;
             }
           }
-          body.attachments.push(attachment);
+
+          if (isInline)
+            body.relatedParts.push(attachment);
+          else
+            body.attachments.push(attachment);
         }
+        header.hasAttachments = body.attachments.length > 0;
         break;
       }
+    }
+
+    // Process the body as needed.
+    if (bodyType === asbEnum.Type.PlainText) {
+      let bodyRep = $quotechew.quoteProcessTextBody(bodyText);
+      header.snippet = $quotechew.generateSnippet(bodyRep,
+                                                  DESIRED_SNIPPET_LENGTH);
+      body.bodyReps = ['plain', bodyRep];
+    }
+    else if (bodyType === asbEnum.Type.HTML) {
+      // For some reason, Gmail converts cid: URLs into a URL relative to the
+      // Gmail web site, which isn't very useful for us. Detect this sort of
+      // tomfoolery and de-munge the URLs into a proper CID reference. These
+      // URLs usually look like the following:
+      //
+      //   ?ui=pb&view=att&th=13ab448f53725ee6m&attid=0.1.1&disp=emb&zw&atsh=1
+      //
+      // |th| is the message's ServerId, and |attid| is the part number for the
+      // attachment. Conveniently, the part number is also listed at the end of
+      // the FileReference in the WBXML response, like so:
+      //
+      //   1417301890109169382/5e21a1963d098bad_0.1.1
+      //
+      // What we want to do is grab the |attid| and then iterate through all our
+      // related parts and compare to the FileReference (stored in the |part|
+      // attribute) to find our attachment info. Then set the CID on our node
+      // from said info.
+      let demungeGmailUrls = function(node, lowerTag) {
+        if (lowerTag === 'img') {
+          let m, src = node.getAttribute('src');
+          // Find the magic Gmail URLs and grab the |attid| parameter.
+          if ((m = /^\?ui=pb&view=att&.*attid=([^&]*)/.exec(src))) {
+            for (let [,part] in Iterator(body.relatedParts)) {
+              // Check if the current related part's FileReference ends in the
+              // part number we're looking for.
+              if (part.part.lastIndexOf('_' + m[1]) ===
+                  part.part.length - m[1].length - 1) {
+                node.classList.add('moz-embedded-image');
+                node.setAttribute('cid-src', part.contentId);
+                return true;
+              }
+            }
+          }
+        }
+        return false;
+      };
+
+      let htmlNode = $htmlchew.sanitizeAndNormalizeHtml(bodyText,
+                                                        demungeGmailUrls);
+      header.snippet = $htmlchew.generateSnippet(htmlNode,
+                                                 DESIRED_SNIPPET_LENGTH);
+      body.bodyReps = ['html', htmlNode.innerHTML];
     }
 
     return { header: header, body: body };
@@ -31161,6 +31563,92 @@ ActiveSyncFolderConn.prototype = {
       }
     });
   },
+
+  // XXX: take advantage of multipart responses here.
+  // See http://msdn.microsoft.com/en-us/library/ee159875%28v=exchg.80%29.aspx
+  downloadMessageAttachments: function(uid, partInfos, callback, progress) {
+    const io = $ascp.ItemOperations.Tags;
+    const ioStatus = $ascp.ItemOperations.Enums.Status;
+    const asb = $ascp.AirSyncBase.Tags;
+
+    let w = new $wbxml.Writer('1.3', 1, 'UTF-8');
+    w.stag(io.ItemOperations);
+    for (let [,part] in Iterator(partInfos)) {
+      w.stag(io.Fetch)
+         .tag(io.Store, 'Mailbox')
+         .tag(asb.FileReference, part.part)
+       .etag();
+    }
+    w.etag();
+
+    this._account.conn.postCommand(w, function(aError, aResult) {
+      if (aError) {
+        console.error('postCommand error:', aError);
+        callback('unknown');
+        return;
+      }
+
+      let globalStatus;
+      let attachments = {};
+
+      let e = new $wbxml.EventParser();
+      e.addEventListener([io.ItemOperations, io.Status], function(node) {
+        globalStatus = node.children[0].textContent;
+      });
+      e.addEventListener([io.ItemOperations, io.Response, io.Fetch],
+                         function(node) {
+        let part = null, attachment = {};
+
+        for (let [,child] in Iterator(node.children)) {
+          switch (child.tag) {
+          case io.Status:
+            attachment.status = child.children[0].textContent;
+            break;
+          case asb.FileReference:
+            part = child.children[0].textContent;
+            break;
+          case io.Properties:
+            var contentType = null, data = null;
+
+            for (let [,grandchild] in Iterator(child.children)) {
+              let textContent = grandchild.children[0].textContent;
+
+              switch (grandchild.tag) {
+              case asb.ContentType:
+                contentType = textContent;
+                break;
+              case io.Data:
+                data = new Buffer(textContent, 'base64');
+                break;
+              }
+            }
+
+            if (contentType && data)
+              attachment.data = new Blob([data], { type: contentType });
+            break;
+          }
+
+          if (part)
+            attachments[part] = attachment;
+        }
+      });
+      e.run(aResult);
+
+      let error = globalStatus !== ioStatus.Success ? 'unknown' : null;
+      let bodies = [];
+      for (let [,part] in Iterator(partInfos)) {
+        if (attachments.hasOwnProperty(part.part) &&
+            attachments[part.part].status === ioStatus.Success) {
+          bodies.push(attachments[part.part].data);
+        }
+        else {
+          error = 'unknown';
+          bodies.push(null);
+        }
+      }
+      callback(error, bodies);
+    });
+  },
 };
 
 function ActiveSyncFolderSyncer(account, folderStorage, _parentLog) {
@@ -31174,6 +31662,13 @@ function ActiveSyncFolderSyncer(account, folderStorage, _parentLog) {
 }
 exports.ActiveSyncFolderSyncer = ActiveSyncFolderSyncer;
 ActiveSyncFolderSyncer.prototype = {
+  /**
+   * Can we synchronize?  Not if we don't have a server id!
+   */
+  get syncable() {
+    return this.folderConn.serverId !== null;
+  },
+
   syncDateRange: function(startTS, endTS, syncCallback) {
     syncCallback('sync', false, true);
     this.folderConn.syncDateRange(startTS, endTS, $date.NOW(),
@@ -31543,6 +32038,77 @@ ActiveSyncJobDriver.prototype = {
   },
 
   //////////////////////////////////////////////////////////////////////////////
+  // syncFolderList
+  //
+  // Synchronize our folder list.  This should always be an idempotent operation
+  // that makes no sense to undo/redo/etc.
+
+  local_do_syncFolderList: function(op, doneCallback) {
+    doneCallback(null);
+  },
+
+  do_syncFolderList: function(op, doneCallback) {
+    var account = this.account, self = this;
+    // establish a connection if we are not already connected
+    if (!account.conn.connected) {
+      account.conn.connect(function(err, config) {
+        if (err) {
+          doneCallback('aborted-retry');
+          return;
+        }
+        self.do_syncFolderList(op, doneCallback);
+      });
+      return;
+    }
+
+    // The inbox needs to be resynchronized if there was no server id and we
+    // have active slices displaying the contents of the folder.  (No server id
+    // means the sync will not happen.)
+    var inboxFolder = this.account.getFirstFolderWithType('inbox'),
+        inboxStorage, inboxNeedsResync = false;
+    if (inboxFolder && inboxFolder.serverId === null) {
+      inboxStorage = this.account.getFolderStorageForFolderId(inboxFolder.id);
+      inboxNeedsResync = inboxStorage.hasActiveSlices;
+    }
+
+    account.syncFolderList(function(err) {
+      if (!err)
+        account.meta.lastFolderSyncAt = Date.now();
+      // save if it worked
+      doneCallback(err ? 'aborted-retry' : null, null, !err);
+
+      if (inboxNeedsResync)
+        inboxStorage.resetAndRefreshActiveSlices();
+    });
+  },
+
+  check_syncFolderList: function(op, doneCallback) {
+    doneCallback('idempotent');
+  },
+
+  local_undo_syncFolderList: function(op, doneCallback) {
+    doneCallback('moot');
+  },
+
+  undo_syncFolderList: function(op, doneCallback) {
+    doneCallback('moot');
+  },
+
+  //////////////////////////////////////////////////////////////////////////////
+  // download
+
+  local_do_download: $jobmixins.local_do_download,
+
+  do_download: $jobmixins.do_download,
+
+  check_download: $jobmixins.check_download,
+
+  local_undo_download: $jobmixins.local_undo_download,
+
+  undo_download: $jobmixins.undo_download,
+
+
+  //////////////////////////////////////////////////////////////////////////////
 };
 
 }); // end define
@@ -31663,9 +32229,15 @@ function ActiveSyncAccount(universe, accountDef, folderInfos, dbConn,
                           this,
                           this._folderInfos.$mutationState);
 
-  // TODO: this is a really hacky way of syncing folders after the first time.
-  if (this.meta.syncKey != '0')
-    setTimeout(this.syncFolderList.bind(this), 1000);
+  // Ensure we have an inbox.  The server id cannot be magically known, so we
+  // create it with a null id.  When we actually sync the folder list, the
+  // server id will be updated.
+  var inboxFolder = this.getFirstFolderWithType('inbox');
+  if (!inboxFolder) {
+    // XXX localized Inbox string (bug 805834)
+    this._addedFolder(null, '0', 'Inbox',
+                      $ascp.FolderHierarchy.Enums.Type.DefaultInbox);
+  }
 }
 exports.ActiveSyncAccount = ActiveSyncAccount;
 ActiveSyncAccount.prototype = {
@@ -31746,6 +32318,7 @@ ActiveSyncAccount.prototype = {
   },
 
   shutdown: function asa_shutdown() {
+    this._LOG.__die();
   },
 
   sliceFolderMessages: function asa_sliceFolderMessages(folderId,
@@ -31773,6 +32346,10 @@ ActiveSyncAccount.prototype = {
      .etag();
 
     this.conn.postCommand(w, function(aError, aResponse) {
+      if (aError) {
+        callback(aError);
+        return;
+      }
       let e = new $wbxml.EventParser();
       let deferredAddedFolders = [];
 
@@ -31814,21 +32391,20 @@ ActiveSyncAccount.prototype = {
       }
 
       console.log('Synced folder list');
-      account.saveAccountState(null, null, 'folderList');
       if (callback)
-        callback();
+        callback(null);
     });
   },
 
   // Map folder type numbers from ActiveSync to Gaia's types
   _folderTypes: {
-     1: 'normal', // User-created generic folder
-     2: 'inbox',
-     3: 'drafts',
-     4: 'trash',
-     5: 'sent',
-     6: 'normal', // Outbox, actually
-    12: 'normal', // User-created mail folder
+     1: 'normal', // Generic
+     2: 'inbox',  // DefaultInbox
+     3: 'drafts', // DefaultDrafts
+     4: 'trash',  // DefaultDeleted
+     5: 'sent',   // DefaultSent
+     6: 'normal', // DefaultOutbox
+    12: 'normal', // Mail
   },
 
   /**
@@ -31850,6 +32426,8 @@ ActiveSyncAccount.prototype = {
     if (!(typeNum in this._folderTypes))
       return true; // Not a folder type we care about.
 
+    const folderType = $ascp.FolderHierarchy.Enums.Type;
+
     let path = displayName;
     let depth = 0;
     if (parentId !== '0') {
@@ -31859,6 +32437,23 @@ ActiveSyncAccount.prototype = {
       let parent = this._folderInfos[parentFolderId];
       path = parent.$meta.path + '/' + path;
       depth = parent.$meta.depth + 1;
+    }
+
+    // Handle sentinel Inbox.
+    if (typeNum === folderType.DefaultInbox) {
+      let existingInboxMeta = this.getFirstFolderWithType('inbox');
+      if (existingInboxMeta) {
+        // update everything about the folder meta
+        existingInboxMeta.serverId = serverId;
+        existingInboxMeta.name = displayName;
+        existingInboxMeta.path = path;
+        existingInboxMeta.depth = depth;
+        // Its folder connection needs to know the updated server id since it
+        // copied it out.
+        let folderStorage = this._folderStorages[existingInboxMeta.id];
+        folderStorage.folderSyncer.folderConn.serverId = serverId;
+        return existingInboxMeta;
+      }
     }
 
     let folderId = this.id + '/' + $a64.encodeInt(this.meta.nextFolderNum++);
@@ -31935,6 +32530,7 @@ ActiveSyncAccount.prototype = {
    *   complete, taking the new folder storage
    */
   _recreateFolder: function asa__recreateFolder(folderId, callback) {
+    this._LOG.recreateFolder(folderId);
     let folderInfo = this._folderInfos[folderId];
     folderInfo.accuracy = [];
     folderInfo.headerBlocks = [];
@@ -32091,7 +32687,12 @@ ActiveSyncAccount.prototype = {
   sendMessage: function asa_sendMessage(composedMessage, callback) {
     // XXX: This is very hacky and gross. Fix it to use pipes later.
     composedMessage._cacheOutput = true;
+    process.immediate = true;
+    composedMessage._processBufferedOutput = function() {
+      // we are stopping the DKIM logic from firing.
+    };
     composedMessage._composeMessage();
+    process.immediate = false;
 
     // ActiveSync 14.0 has a completely different API for sending email. Make
     // sure we format things the right way.
@@ -32167,11 +32768,15 @@ var LOGFAB = exports.LOGFAB = $log.register($module, {
     events: {
       createFolder: {},
       deleteFolder: {},
+      recreateFolder: { id: false },
     },
     asyncJobs: {
       runOp: { mode: true, type: true, error: false, op: false },
       saveAccountState: { reason: false },
     },
+    errors: {
+      opError: { mode: false, type: false, ex: $log.EXCEPTION },
+    }
   },
 });
 
@@ -32358,28 +32963,23 @@ CompositeAccount.prototype = {
   },
 
   sendMessage: function(composedMessage, callback) {
+    // Render the message to its output buffer.
+    composedMessage._cacheOutput = true;
+    process.immediate = true;
+    composedMessage._processBufferedOutput = function() {
+      // we are stopping the DKIM logic from firing.
+    };
+    composedMessage._composeMessage();
+    process.immediate = false;
+
     return this._sendPiece.sendMessage(
       composedMessage,
       function(err, errDetails) {
         // We need to append the message to the sent folder if we think we sent
         // the message okay.
         if (!err) {
-          // have it internally accumulate the data rather than using the stream
-          // mechanism.
-          composedMessage._cacheOutput = true;
-          // reset the offsets since we are reusing the composer.
-          composedMessage._message.processingStart = 0;
-          composedMessage._message.processingPos = 0;
-          var data = null;
-          process.immediate = true;
-          composedMessage._processBufferedOutput = function() {
-            data = composedMessage._outputBuffer;
-          };
-          composedMessage._composeMessage();
-          process.immediate = false;
-
           var message = {
-            messageText: data.trimRight(),
+            messageText: composedMessage._outputBuffer,
             // do not specify date; let the server use its own timestamping
             // since we want the approximate value of 'now' anyways.
             flags: ['Seen'],
@@ -32424,7 +33024,7 @@ function accountTypeToClass(type) {
 exports.accountTypeToClass = accountTypeToClass;
 
 // Simple hard-coded autoconfiguration by domain...
-var autoconfigByDomain = {
+var autoconfigByDomain = exports._autoconfigByDomain = {
   'localhost': {
     type: 'imap+smtp',
     incoming: {
@@ -32453,6 +33053,15 @@ var autoconfigByDomain = {
       port: 465,
       socketType: 'SSL',
       username: '%EMAILLOCALPART%',
+    },
+  },
+  'aslocalhost': {
+    type: 'activesync',
+    displayName: 'Test',
+    incoming: {
+      // This string may be clobbered with the correct port number when
+      // running as a unit test.
+      server: 'http://localhost:8080',
     },
   },
   // Mapping for a nonexistent domain for testing a bad domain without it being
@@ -32527,12 +33136,7 @@ Configurators['imap+smtp'] = {
             userDetails, credentials,
             imapConnInfo, smtpConnInfo, results.imap[1],
             results.imap[2]);
-          account.syncFolderList(function() {
-            account.ensureEssentialFolders(function() {
-              callback(null, account);
-            });
-          });
-
+          callback(null, account);
         }
         // -- either/both bad
         else {
@@ -32594,9 +33198,7 @@ Configurators['imap+smtp'] = {
 
     var account = this._loadAccount(universe, accountDef,
                                     oldAccountInfo.folderInfo);
-    account.syncFolderList(function() {
-      callback(null, account);
-    });
+    callback(null, account);
   },
 
   /**
@@ -32652,7 +33254,7 @@ Configurators['imap+smtp'] = {
       $meta: {
         nextFolderNum: 0,
         nextMutationNum: 0,
-        lastFullFolderProbeAt: 0,
+        lastFolderSyncAt: 0,
         capability: (oldFolderInfo && oldFolderInfo.$meta.capability) ||
                     imapProtoConn.capabilities,
         rootDelim: (oldFolderInfo && oldFolderInfo.$meta.rootDelim) ||
@@ -32741,6 +33343,7 @@ Configurators['fake'] = {
     var folderInfo = {
       $meta: {
         nextMutationNum: 0,
+        lastFolderSyncAt: 0,
       },
       $mutations: [],
       $mutationState: {},
@@ -32804,9 +33407,7 @@ Configurators['activesync'] = {
       };
 
       var account = self._loadAccount(universe, accountDef, conn);
-      account.syncFolderList(function() {
-        callback(null, account);
-      });
+      callback(null, account);
     });
   },
 
@@ -32835,9 +33436,7 @@ Configurators['activesync'] = {
     };
 
     var account = this._loadAccount(universe, accountDef, null);
-    account.syncFolderList(function() {
-      callback(null, account);
-    });
+    callback(null, account);
   },
 
   /**
@@ -32851,6 +33450,7 @@ Configurators['activesync'] = {
       $meta: {
         nextFolderNum: 0,
         nextMutationNum: 0,
+        lastFolderSyncAt: 0,
         syncKey: '0',
       },
       $mutations: [],
@@ -33146,12 +33746,23 @@ Autoconfigurator.prototype = {
       // XXX: We need to normalize the domain here to get the base domain, but
       // that's complicated because people like putting dots in TLDs. For now,
       // let's just pretend no one would do such a horrible thing.
-      mxDomain = mxDomain.split('.').slice(-2).join('.');
+      mxDomain = mxDomain.split('.').slice(-2).join('.').toLowerCase();
+      console.log('  Found MX for', mxDomain);
 
       if (domain === mxDomain)
         return callback('unknown');
 
-      self._getConfigFromDB(mxDomain, callback);
+      // If we found a different domain after MX lookup, we should look in our
+      // local file store (mostly to support Google Apps domains) and, if that
+      // doesn't work, the Mozilla ISPDB.
+      console.log('  Looking in local file store');
+      self._getConfigFromLocalFile(mxDomain, function(error, config) {
+        if (!error)
+          return callback(error, config);
+
+        console.log('  Looking in the Mozilla ISPDB');
+        self._getConfigFromDB(mxDomain, callback);
+      });
     });
   },
 
@@ -33167,7 +33778,7 @@ Autoconfigurator.prototype = {
   getConfig: function getConfig(userDetails, callback) {
     let [emailLocalPart, emailDomainPart] = userDetails.emailAddress.split('@');
     let domain = emailDomainPart.toLowerCase();
-    console.log('Attempting to get autoconfiguration for:'. domain);
+    console.log('Attempting to get autoconfiguration for', domain);
 
     const placeholderFields = {
       incoming: ['username', 'hostname', 'server'],
@@ -33547,7 +34158,7 @@ const MAX_LOG_BACKLOG = 30;
  *   }
  * ]]
  */
-function MailUniverse(callAfterBigBang) {
+function MailUniverse(callAfterBigBang, testOptions) {
   /** @listof[Account] */
   this.accounts = [];
   this._accountsById = {};
@@ -33559,7 +34170,7 @@ function MailUniverse(callAfterBigBang) {
   /**
    * @dictof[
    *   @key[AccountID]
-   *   @key[@dict[
+   *   @value[@dict[
    *     @key[active Boolean]{
    *       Is there an active operation right now?
    *     }
@@ -33614,7 +34225,7 @@ function MailUniverse(callAfterBigBang) {
   this._logBacklog = null;
 
   this._LOG = null;
-  this._db = new $maildb.MailDB();
+  this._db = new $maildb.MailDB(testOptions);
   this._cronSyncer = new $cronsync.CronSyncer(this);
   var self = this;
   this._db.getConfig(function(configObj, accountInfos, lazyCarryover) {
@@ -33670,7 +34281,8 @@ function MailUniverse(callAfterBigBang) {
       self._db.saveConfig(self.config);
 
       // - Try to re-create any accounts using old account infos.
-      if (lazyCarryover && self.online) {
+      if (lazyCarryover) {
+        self._LOG.configMigrating(lazyCarryover);
         var waitingCount = 0;
         var oldVersion = lazyCarryover.oldVersion;
         for (i = 0; i < lazyCarryover.accountInfos.length; i++) {
@@ -33688,6 +34300,9 @@ function MailUniverse(callAfterBigBang) {
         }
         // Do not let callAfterBigBang get called.
         return;
+      }
+      else {
+        self._LOG.configCreated(self.config);
       }
     }
     self._initFromConfig();
@@ -34001,6 +34616,11 @@ MailUniverse.prototype = {
     }
 
     this.__notifyAddedAccount(account);
+
+    // - issue a (non-persisted) syncFolderList if needed
+    var timeSinceLastFolderSync = Date.now() - account.meta.lastFolderSyncAt;
+    if (timeSinceLastFolderSync >= $syncbase.SYNC_FOLDER_LIST_EVERY_MS)
+      this.syncFolderList(account);
 
     // - check for mutations that still need to be processed
     // This will take care of deferred mutations too because they are still
@@ -34566,6 +35186,22 @@ MailUniverse.prototype = {
       this._opCompletionListenersByAccount[account.id] = callback;
   },
 
+  syncFolderList: function(account, callback) {
+    this._queueAccountOp(
+      account,
+      {
+        type: 'syncFolderList',
+        // no need to track this in the mutations list
+        longtermId: 'internal',
+        lifecycle: 'do',
+        localStatus: 'done',
+        serverStatus: null,
+        tryCount: 0,
+        humanOp: 'syncFolderList'
+      },
+      callback);
+  },
+
   /**
    * Download one or more related-part or attachments from a message.
    * Attachments are named by their index because the indices are stable and
@@ -34800,6 +35436,8 @@ var LOGFAB = exports.LOGFAB = $log.register($module, {
   MailUniverse: {
     type: $log.ACCOUNT,
     events: {
+      configCreated: {},
+      configMigrating: {},
       configLoaded: {},
       createAccount: { type: true, id: false },
       opDeferred: { type: true, id: false },
@@ -34808,6 +35446,8 @@ var LOGFAB = exports.LOGFAB = $log.register($module, {
       opMooted: { type: true, id: false },
     },
     TEST_ONLY_events: {
+      configCreated: { config: false },
+      configMigrating: { lazyCarryover: false },
       configLoaded: { config: false, accounts: false },
       createAccount: { name: false },
     },

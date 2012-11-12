@@ -23,18 +23,26 @@
         "120": "/style/icons/Contacts.png",
         "60": "/style/icons/60/Contacts.png"
       }
+    },
+    "ftu": {
+      "launch_path": "/ftu/index.html",
+      "name": "FTU",
+      "fullscreen": "true"
     }
   },
   "permissions": {
     "telephony":{},
     "voicemail":{},
-    "contacts":{},
+    "contacts":{ "access": "readwrite" },
     "mobileconnection":{},
     "attention":{},
-    "settings":{},
+    "settings":{ "access": "readonly" },
     "desktop-notification":{},
     "alarms": {},
-    "systemXHR": {}
+    "systemXHR": {},
+    "wifi-manage":{},
+    "wifi":{},
+    "time": {}
   },
   "icons": {
     "120": "/dialer/style/icons/Dialer.png",
@@ -62,13 +70,13 @@
       "filters": {
         "type": "webtelephony/number"
       },
-      "href": "/dialer/index.html",
+      "href": "/dialer/index.html#keyboard-view",
       "disposition": "window"
     }
   },
   "messages": [
-     { "telephony-incoming": "/dialer/index.html" },
-     { "icc-dialing": "/dialer/index.html" },
+     { "telephony-new-call": "/dialer/index.html#keyboard-view" },
+     { "bluetooth-dialer-command": "/dialer/index.html#keyboard-view" },
      { "alarm": "/facebook/fb_sync.html" }
   ]
 }

@@ -173,9 +173,16 @@ var AppIntegration = (function() {
 
     /**
      * Launches application and switches focus to its frame.
+     *
+     * @param {Boolean} [waitForBody=true] when true will wait until body is displayed.
+     * @param {Function} [callback] for inheritance purposes.
      */
-    launch: function(callback) {
+    launch: function(waitForBody, callback) {
       var self = this;
+
+      if (typeof(waitForBody) === 'undefined') {
+        waitForBody = true;
+      }
 
       this.task(function(app, next, done) {
         var device = app.device;
@@ -205,6 +212,9 @@ var AppIntegration = (function() {
         self.src = result.src;
         self.name = result.name;
         self.frame = result.frame;
+
+        var body = yield device.findElement('body');
+        yield app.waitUntilElement(body, 'displayed');
 
         done(null, self);
 
@@ -267,7 +277,7 @@ var AppIntegration = (function() {
      * Wait until element condition is met.
      */
     waitUntilElement: function(element, method, callback) {
-      this.waitFor(element[method].bind(element), 3000, callback);
+      this.waitFor(element[method].bind(element), 15000, callback);
     },
 
     /**
@@ -324,26 +334,6 @@ var AppIntegration = (function() {
       }, callback);
     },
 
-    remoteDate: function(date, callback) {
-      callback = (callback || this.defaultCallback);
-
-      this.remoteDateObject(date, function(err, result) {
-        if (err) {
-          callback(err);
-          return;
-        }
-
-        callback(null, new Date(
-          result.year,
-          result.month,
-          result.date,
-          result.hours,
-          result.minutes,
-          result.seconds
-        ));
-      });
-    },
-
     /**
      * Given a date object returns an object with
      * date information relative to the remote runtime.
@@ -354,23 +344,26 @@ var AppIntegration = (function() {
      *
      * @param {Date} date date object local to test runtime.
      */
-    remoteDateObject: function(date, callback) {
-      if (typeof(date) === 'undefined') {
-        date = new Date();
-      }
-
+    remoteDate: function(callback) {
       this.task(function(app, next, done) {
-        var result = yield IntegrationHelper.sendAtom(
+
+        var remote = yield IntegrationHelper.sendAtom(
           app.device,
           '/tests/atoms/remote_date',
           false,
-          [date.valueOf()],
           next
         );
 
-        done(null, result);
+        done(null, new Date(
+          remote.year,
+          remote.month,
+          remote.date,
+          remote.hours,
+          remote.minutes,
+          remote.seconds
+        ));
 
-      }, callback);
+      }, callback, this);
     },
 
     /**
@@ -415,14 +408,33 @@ var AppIntegration = (function() {
           var tagName = yield element.tagName(next);
           var type = yield element.getAttribute('type', next);
           var name = yield element.getAttribute('name', next);
+          var atts = name.match(/\[(.*?)\]/g);
           var value = yield element.getAttribute('value', next);
-
-          values[name] = value;
+          if (!atts) {
+            values[name] = value;
+          } else {
+            var name = name.substring(0, name.indexOf('['));
+            values[name] = values[name] || {};
+            values[name] = this._nameToHash(values[name], atts, value);
+          }
         }
-
-
         done(null, values);
       }, callback);
+    },
+
+    _nameToHash: function(result, atts, value) {
+      var pointer = result;
+      for (var i = 0; i < atts.length; i++) {
+        var name = atts[i].substring(1, atts[i].length - 1);
+        if (i == atts.length - 1) {
+          pointer[name] = value;
+          break;
+        }
+        if (!pointer[name])
+          pointer[name] = {};
+        pointer = pointer[name];
+      }
+      return result;
     },
 
     /**
@@ -444,26 +456,87 @@ var AppIntegration = (function() {
      *                        (where key is the name attr).
      * @param {Function} [callback] optional uses default callback of driver.
      */
+
     updateForm: function(formElement, values, callback) {
       var self = this;
-
+      var values = this._resolveNames(values);
       this.task(function(app, next, done) {
         for (var field in values) {
-
-          // the use of 'next' here is required because
-          // we are using the externally found formElement.
           var el = yield formElement.findElement(
             '[name="' + field + '"]',
             'css selector',
             next
           );
-
           yield el.clear(next);
           yield el.sendKeys([values[field]], next);
         }
 
         done();
-      }, callback);
+      }.bind(this), callback);
+    },
+
+    /**
+     * Private method that flatten a object
+     * Arrays will be named as attr[i]
+     * Nested objects will be named as attr[attr2]
+     *
+     *
+     *     var values = {
+     *       email: [
+     *        {type: 'personal', email: 'test@test.com'},
+     *        {type: 'personal', email: 'test2@test.com'},
+     *       ],
+     *       name: 'Test'
+     *     };
+     *
+     *     Will return
+     *     {
+     *       email[0][type]: 'personal',
+     *       email[0][email]: 'test@test.com',
+     *       email[1][type]: 'personal',
+     *       email[1][email]: 'test2@test.com',
+     *       name: 'Test'
+     *     };
+     *
+     *
+     * @param {Object} values object of key/value pairs
+     *                        (where key is the name attr).
+     */
+
+    _resolveNames: function(values) {
+      var flatten = function(obj) {
+        var toReturn = {};
+        for (var i in obj) {
+          if ((typeof obj[i]) == 'object') {
+            var flatObject = flatten(obj[i]);
+            for (var x in flatObject) {
+              toReturn['[' + i + ']' + x] = flatObject[x];
+            }
+          } else {
+            toReturn['[' + i + ']'] = obj[i];
+          }
+        }
+        return toReturn;
+      };
+
+      var toUpdate = {};
+
+      for (var field in values) {
+        // the use of 'next' here is required because
+        // we are using the externally found formElement.
+        var currentValue = values[field];
+        if (typeof currentValue === 'string') {
+          toUpdate[field] = currentValue;
+        } else {
+          var flattenValue = flatten(currentValue);
+          for (var elem in flattenValue) {
+            var fieldName = field + elem;
+            var value = flattenValue[elem];
+            toUpdate[fieldName] = value;
+          }
+        }
+      }
+      return toUpdate;
     }
 
   };
