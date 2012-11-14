@@ -63,7 +63,7 @@ function audioPreview(element) {
   var playing = !audio.paused;
 
   audio.src = 'resources/ringtones/' + element.querySelector('input').value;
-  if (source == audio.src && playing) {
+  if (source === audio.src && playing) {
     audio.stop();
   } else {
     audio.play();

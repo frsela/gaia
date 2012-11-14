@@ -78,7 +78,9 @@ var Camera = {
     height: 288
   },
 
+  _shutterKey: 'camera.shutter.enabled',
   _shutterSound: new Audio('./resources/sounds/shutter.ogg'),
+  _shutterSoundEnabled: true,
 
   _dcfConfig: {
     key: 'dcf_key',
@@ -89,7 +91,7 @@ var Camera = {
   },
 
   THUMB_WIDTH: 40,
-  THUBM_HEIGHT: 40,
+  THUMB_HEIGHT: 40,
 
   // Because we dont want to wait for the geolocation query
   // before we can take a photo, we keep a track of the users
@@ -108,7 +110,7 @@ var Camera = {
   RECORD_SPACE_PADDING: 1024 * 1024 * 1,
 
   // Maximum image resolution for still photos taken with camera
-  MAX_IMAGE_RES: 1920000,
+  MAX_IMAGE_RES: 1024 * 768, // was: 1600*1200
 
   get overlayTitle() {
     return document.getElementById('overlay-title');
@@ -197,6 +199,17 @@ var Camera = {
 
     if (this._secureMode) {
       this.galleryButton.setAttribute('disabled', 'disabled');
+    }
+
+    if ('mozSettings' in navigator) {
+      var req = navigator.mozSettings.createLock().get(this._shutterKey);
+      req.onsuccess = (function onsuccess() {
+        this._shutterSoundEnabled = req.result[this._shutterKey];
+      }).bind(this);
+
+      navigator.mozSettings.addObserver(this._shutterKey, (function(e) {
+        this._shutterSoundEnabled = e.settingValue;
+      }).bind(this));
     }
 
     this._pictureStorage
@@ -374,10 +387,14 @@ var Camera = {
   },
 
   generateVideoThumbnail: function camera_generateVideoThumbnail(callback) {
-    var self = this;
+    var video;
     var preview = this._videoPreview;
-    this._videoStorage.get(this._videoPath).onsuccess = function(e) {
-      var video = e.target.result;
+    var thumbGenerated = function() {
+      callback(blob, video.type);
+    }
+
+    this._videoStorage.get(this._videoPath).onsuccess = (function(e) {
+      video = e.target.result;
       // TODO: This check shouldnt be needed as we wont be recording
       // in a format we cannot play
       // https://bugzilla.mozilla.org/show_bug.cgi?id=799306
@@ -389,23 +406,29 @@ var Camera = {
       preview.preload = 'metadata';
       preview.width = self.THUMB_WIDTH + 'px';
       preview.height = self.THUMB_HEIGHT + 'px';
-      preview = url;
-      preview.onloadedmetadata = function() {
-        URL.revokeObjectURL(url);
-        var image;
-        try {
-          var canvas = document.createElement('canvas');
-          var ctx = canvas.getContext('2d');
-          canvas.width = self.THUMB_WIDTH;
-          canvas.height = self.THUMB_HEIGHT;
-          ctx.drawImage(preview, 0, 0, self.THUMB_WIDTH, self.THUMB_HEIGHT);
-          image = canvas.mozGetAsFile('poster', 'image/jpeg');
-        } catch (e) {
-          console.error('Failed to create a poster image:', e);
-        }
-        callback(image, video.type);
-      };
-    };
+      preview.src = url;
+      preview.onloadedmetadata =
+        this.generateThumbnail.bind(this, preview, thumbGenerated);
+    }).bind(this);
+  },
+
+  generateImageThumbnail: function camera_generateImageThumbnail(input, callback) {
+    var img = document.createElement('img');
+    img.src = window.URL.createObjectURL(input);
+    img.onload = this.generateThumbnail.bind(this, img, callback);
+  },
+
+  generateThumbnail: function camera_generateThumbnail(input, callback) {
+    var canvas = document.createElement('canvas');
+    canvas.width = this.THUMB_WIDTH;
+    canvas.height = this.THUMB_HEIGHT;
+    URL.revokeObjectURL(input.src);
+    try {
+      canvas.getContext('2d').drawImage(input, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(callback);
+    } catch (e) {
+      console.error('Failed to create a poster image:', e);
+    }
   },
 
   startRecordingTimer: function camera_startRecordingTimer() {
@@ -609,7 +632,9 @@ var Camera = {
         this.pickPictureSize(camera.capabilities.pictureSizes);
       this.enableCameraFeatures(camera.capabilities);
       camera.onShutter = (function() {
-        this._shutterSound.play();
+        if (this._shutterSoundEnabled) {
+          this._shutterSound.play();
+        }
       }).bind(this);
       camera.onRecorderStateChange = this.recordingStateChanged.bind(this);
       camera.getPreviewStream(this._previewConfig, gotPreviewScreen.bind(this));
@@ -674,12 +699,14 @@ var Camera = {
     this._photosTaken.forEach(function foreach_photos(image) {
       var wrapper = document.createElement('div');
       var preview = document.createElement('img');
+      wrapper.style.visibility = 'hidden';
       wrapper.classList.add('thumbnail');
       wrapper.classList.add(/image/.test(image.type) ? 'image' : 'video');
       wrapper.setAttribute('data-filetype', image.type);
       wrapper.setAttribute('data-filename', image.name);
       preview.src = window.URL.createObjectURL(image.blob);
       preview.onload = function() {
+        wrapper.style.visibility = 'visible';
         window.URL.revokeObjectURL(this.src);
       };
       wrapper.appendChild(preview);
@@ -764,8 +791,12 @@ var Camera = {
 
           return;
         }
-        this.addToFilmStrip(name, blob, 'image/jpeg');
-        this.checkStorageSpace();
+
+        this.generateImageThumbnail(blob, (function(thumbBlob) {
+          this.addToFilmStrip(name, thumbBlob, 'image/jpeg');
+          this.checkStorageSpace();
+        }).bind(this));
+
       }).bind(this);
 
       addreq.onerror = function() {

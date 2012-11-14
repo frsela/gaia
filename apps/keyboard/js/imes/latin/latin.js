@@ -53,9 +53,8 @@
   var idleTimer;          // Used by deactivate
   var suggestionsTimer;   // Used by updateSuggestions;
 
-  // Tell the worker to release the dictionary memory when the keyboard
-  // is inactive for this long.
-  const releaseDictionaryTimeout = 30000;  // 30 seconds of idle time
+  // Terminate the worker when the keyboard is inactive for this long.
+  const workerTimeout = 30000;  // 30 seconds of idle time
 
   // If we get an autorepeating key is sent to us, don't offer suggestions
   // for this long, until we're pretty certain that the autorepeat
@@ -65,6 +64,7 @@
   // Some keycodes that we use
   const SPACE = KeyEvent.DOM_VK_SPACE;
   const BACKSPACE = KeyEvent.DOM_VK_BACK_SPACE;
+  const RETURN = KeyEvent.DOM_VK_RETURN;
   const PERIOD = 46;
   const QUESTION = 63;
   const EXCLAMATION = 33;
@@ -146,9 +146,10 @@
     if (!worker)
       return;
     idleTimer = setTimeout(function onIdleTimeout() {
-      language = null;
-      worker.postMessage({cmd: 'idle', args: []});
-    }, releaseDictionaryTimeout);
+      // Let's terminate the worker.
+      worker.terminate();
+      worker = null;
+    }, workerTimeout);
   }
 
   function displaysCandidates() {
@@ -203,6 +204,11 @@
 
     // If we're offering suggestions, ask the worker to make them now
     updateSuggestions(repeat);
+
+    // Exit symbol layout mode after space or return key is pressed.
+    if (keycode === SPACE || keycode === RETURN) {
+      keyboard.setLayoutPage(LAYOUT_PAGE_DEFAULT);
+    }
   }
 
   // If the user selections one of the suggestions offered by this input method

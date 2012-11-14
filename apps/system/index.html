@@ -12,6 +12,7 @@
     <script defer src="shared/js/settings_listener.js"></script>
     <script defer src="shared/js/custom_dialog.js"></script>
     <script defer src="shared/js/notification_helper.js"></script>
+    <script defer src="shared/js/async_storage.js"></script>
 
     <!-- Wrapper -->
     <link rel="stylesheet" type="text/css" href="style/wrapper/wrapper.css">
@@ -282,7 +283,7 @@
         <div id="notifications-container">
           <!-- Update Manager -->
           <div id="update-manager-container">
-            <div class="count">
+            <div class="icon">
             </div>
             <div class="activity">
             </div>
@@ -342,7 +343,7 @@
           </section>
           <menu>
             <button id="dont-send-report" disabled="true" data-l10n-id="crash-dont-send">Don't Send</button>
-            <button id="send-report" data-l10n-id="crash-send">Send Report</button>
+            <button id="send-report" class="recommend" data-l10n-id="crash-send">Send Report</button>
           </menu>
         </form>
         <div id="popup-container">
@@ -353,7 +354,20 @@
               <div id="popup-throbber"></div>
             </header>
           </section>
-          <div id="frame-container"></div>
+          <div id="frame-container">
+            <div id="popup-error-dialog" role="dialog">
+              <div class="inner">
+                <h3 data-l10n-id="error-title" id="popup-error-title">Hmm, the app is having problems.</h3>
+                <p>
+                <span data-l10n-id="error-message" id="popup-error-message">The app has encountered an error and is not loading properly.</span>
+                </p>
+              </div>
+              <menu data-items="2">
+                <button id="popup-error-back" data-l10n-id="close">Close</button>
+                <button id="popup-error-reload" data-l10n-id="try-again">Try again</button>
+              </menu>
+            </div>
+          </div>
         </div>
 
         <div id="trustedui-container">
@@ -392,7 +406,7 @@
         <div id="modal-dialog">
           <div id="modal-dialog-alert" role="dialog">
             <div class="modal-dialog-message-container inner">
-              <h3></h3>
+              <h3 id="modal-dialog-alert-title"></h3>
               <p>
                 <span id="modal-dialog-alert-message"></span>
               </p>
@@ -404,7 +418,7 @@
 
           <div id="modal-dialog-confirm" role="dialog">
             <div class="modal-dialog-message-container inner">
-              <h3></h3>
+              <h3 id="modal-dialog-confirm-title"></h3>
               <p>
                 <span id="modal-dialog-confirm-message"></span>
               </p>
@@ -417,7 +431,7 @@
 
           <div id="modal-dialog-prompt" role="dialog">
             <div class="modal-dialog-message-container inner">
-              <h3></h3>
+              <h3 id="modal-dialog-prompt-title"></h3>
               <p>
                 <span id="modal-dialog-prompt-message"></span>
                 <input id="modal-dialog-prompt-input" />
@@ -431,15 +445,14 @@
 
           <div id="modal-dialog-error" role="dialog">
             <div class="modal-dialog-message-container inner">
-              <h3 data-l10n-id="error-title">Hmm, the app is having problems.</h3>
+              <h3 data-l10n-id="error-title" id="modal-dialog-error-title">Hmm, the app is having problems.</h3>
               <p>
-                <span id="modal-dialog-sad-face">:(</span>
-                <span data-l10n-id="error-message">The app has encountered an error and is not loading properly.</span>
+              <span data-l10n-id="error-message" id="modal-dialog-error-message">The app has encountered an error and is not loading properly.</span>
               </p>
             </div>
             <menu data-items="2">
-              <button id="modal-dialog-error-back" data-l10n-id="back">Back</button>
-              <button id="modal-dialog-error-reload" data-l10n-id="reload">Try Reloading</button>
+              <button id="modal-dialog-error-back" data-l10n-id="close">Close</button>
+              <button id="modal-dialog-error-reload" data-l10n-id="try-again">Try again</button>
             </menu>
           </div>
 
@@ -566,8 +579,22 @@
             </tr>
           </table>
           <menu>
-            <button id="app-install-cancel-button" type="reset" data-l10n-id="cancel">Cancel</button>
-            <button id="app-install-install-button" type="submit" data-l10n-id="install">Install</button>
+            <button id="app-install-cancel-button" data-l10n-id="cancel">Cancel</button>
+            <button id="app-install-install-button" class="recommend" data-l10n-id="install">Install</button>
+          </menu>
+        </section>
+      </form>
+
+      <form id="updates-download-dialog" data-type="confirm" role="dialog" data-z-index-level="updates-download-dialog">
+        <section>
+          <h1>
+            Updates
+          </h1>
+          <ul>
+          </ul>
+          <menu>
+            <button id="updates-later-button" type="reset" data-l10n-id="later">Later</button>
+            <button id="updates-download-button" type="submit" data-l10n-id="download">Download</button>
           </menu>
         </section>
       </form>
@@ -653,7 +680,7 @@
       </div>
 
       <div id="update-manager-toaster" data-z-index-level="notification-toaster">
-        <div class="count">
+        <div class="icon">
         </div>
         <div class="message">
         </div>
