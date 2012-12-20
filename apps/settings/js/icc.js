@@ -18,6 +18,7 @@
   var iccLastCommandProcessed = false;
   var stkOpenAppName = null;
   var stkLastSelectedTest = null;
+  var displayTextTimeout = 10000;
   var icc;
 
   init();
@@ -517,7 +518,7 @@
   function displayText(command, cb) {
     var options = command.options;
     if (!options.userClear) {
-    var timeoutId = setTimeout(function() {
+      var timeoutId = setTimeout(function() {
         alertbox.classList.add('hidden');
         if (cb) {
           cb(false);
