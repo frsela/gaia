@@ -30,7 +30,8 @@
   window.navigator.mozSetMessageHandler('icc-stkcommand',
     function handleSTKCommand(command) {
       debug('STK Proactive Command:', command);
-      if (command.typeOfCommand == icc.STK_CMD_SET_UP_MENU) {
+      switch (command.typeOfCommand) {
+      case icc.STK_CMD_SET_UP_MENU:
         debug('STK_CMD_SET_UP_MENU:', command.options);
         var reqApplications = window.navigator.mozSettings.createLock().set({
           'icc.applications': JSON.stringify(command.options)
@@ -41,7 +42,25 @@
             resultCode: icc.STK_RESULT_OK
           });
         }
-      } else {
+        break;
+
+      case icc.STK_CMD_SET_UP_IDLE_MODE_TEXT:
+        debug('STK_CMD_SET_UP_IDLE_MODE_TEXT', command.options);
+        icc.sendStkResponse(command, {
+          resultCode: icc.STK_RESULT_OK
+        });
+        displayNotification(command);
+        break;
+
+      case icc.STK_CMD_REFRESH:
+        debug('STK_CMD_REFRESH', command.options);
+        icc.sendStkResponse(command, {
+          resultCode: icc.STK_RESULT_OK
+        });
+        clearNotification();
+        break;
+
+      default:
         // Unsolicited command? -> Open settings
         debug('CMD: ', command);
         var application = document.location.protocol + '//' +
@@ -66,4 +85,26 @@
         }
       }
     });
+
+  /**
+   * Display text on the notifications bar and Idle screen
+   */
+  function displayNotification(command) {
+    debug('displayNotification');
+    navigator.mozApps.getSelf().onsuccess = function getSelfCB(evt) {
+      debug('sendNotification');
+      var app = evt.target.result;
+      var iconURL = NotificationHelper.getIconURI(app);
+      NotificationHelper.send('STK', command.options.text, iconURL);
+    };
+  }
+
+  /**
+   * Remove text on the notifications bar and Idle screen
+   */
+  function clearNotification() {
+    debug('clearNotification - TODO');
+    // TODO (Notification bar doesn't support remove notifications just now)
+  }
+
 })();

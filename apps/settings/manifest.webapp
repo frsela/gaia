@@ -20,7 +20,6 @@
     "wifi-manage":{},
     "attention":{},
     "time":{},
-    "desktop-notification":{},
     "power":{},
     "telephony":{}
   },

@@ -53,8 +53,8 @@
       handleSTKCommand(event.command);
     });
     window.addEventListener('stkasynccommand',
-        function do_handleAsyncSTKCmd(event) {
-      handleSTKCommand(event.detail.command);
+      function do_handleAsyncSTKCmd(event) {
+        handleSTKCommand(event.detail.command);
     });
 
     /**
@@ -153,19 +153,9 @@
         break;
 
       case icc.STK_CMD_SET_UP_IDLE_MODE_TEXT:
-        iccLastCommandProcessed = true;
-        responseSTKCommand({
-          resultCode: icc.STK_RESULT_OK
-        });
-        displayNotification(command);
-        break;
-
       case icc.STK_CMD_REFRESH:
-        iccLastCommandProcessed = true;
-        responseSTKCommand({
-          resultCode: icc.STK_RESULT_OK
-        });
-        clearNotification();
+        debug('STK_CMD_SET_UP_IDLE_MODE_TEXT & STK_CMD_REFRESH ' +
+          'Managed in system app (icc_cache.js');
         break;
 
       case icc.STK_CMD_SEND_SMS:
@@ -610,21 +600,6 @@
       alertbox_msg.textContent = options.text;
       alertbox.classList.remove('hidden');
     }
-  }
-
-  /**
-   * Display text on the notifications bar and Idle screen
-   */
-  function displayNotification(command) {
-    var options = command.options;
-    NotificationHelper.send('STK', options.text);
-  }
-
-  /**
-   * Remove text on the notifications bar and Idle screen
-   */
-  function clearNotification() {
-    // TO-DO
   }
 
   /**
