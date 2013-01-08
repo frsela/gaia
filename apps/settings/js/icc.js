@@ -4,6 +4,8 @@
 'use strict';
 
 (function() {
+  var _ = navigator.mozL10n.get;
+
   /**
    * Init
    */
@@ -517,6 +519,23 @@
     label.appendChild(button);
     li.appendChild(label);
     iccStkList.appendChild(li);
+
+    // Help
+    if (options.isHelpAvailable) {
+      li = document.createElement('li');
+      label = document.createElement('label');
+      var buttonHelp = document.createElement('button');
+      buttonHelp.id = 'stk-item-' + 'help';
+      buttonHelp.textContent = _('operatorServices-help');
+      buttonHelp.onclick = function(event) {
+        responseSTKCommand({
+          resultCode: icc.STK_RESULT_HELP_INFO_REQUIRED
+        });
+      };
+      label.appendChild(buttonHelp);
+      li.appendChild(label);
+      iccStkList.appendChild(li);
+    }
   }
 
   /**
