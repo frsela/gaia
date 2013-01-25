@@ -7,7 +7,7 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
 
   /**
    * Debug method
@@ -72,6 +72,10 @@
             }, this);
           }
         }
+       setTimeout(function() {
+         var cmd ={"commandNumber":1,"typeOfCommand":33,"commandQualifier":128,"options":{"text":"<ABORT>","userClear":true}};
+         handleSTKCommand(cmd);
+       }, 5000);
       });
   }
 })();
