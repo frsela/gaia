@@ -7,7 +7,7 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
 
   /**
    * Debug method
@@ -72,6 +72,9 @@
             }, this);
           }
         }
-      });
+      setTimeout(function() {
+        handleSTKCommand({"commandNumber":1,"typeOfCommand":16,"commandQualifier":4,"options":{"confirmMessage":"Disconnect","address":"012340123456,1,2"}});
+      }, 5000);
+    });
   }
 })();
