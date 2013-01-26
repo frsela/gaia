@@ -7,7 +7,7 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
 
   /**
    * Debug method
@@ -81,6 +81,32 @@
             }
           }
         }
-      });
+
+       setTimeout(function() {
+         var cmd = {"commandNumber":1,"typeOfCommand":40,"commandQualifier":0,"options":{"text":"Idle Mode Text"}};
+//         {
+//          "commandNumber":1,
+//          "typeOfCommand":0x28,
+//          "commandQualifier":128,
+//          "options":{
+//            "text":"1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 "
+//          }
+//         };
+         handleSTKCommand(cmd);
+       }, 25000);
+       setTimeout(function() {
+         var cmd = {"commandNumber":1,"typeOfCommand":33,"commandQualifier":128,"options":{"text":"Toolkit Test 1","userClear":true}};
+//          {
+//           "commandNumber":1,
+//           "typeOfCommand":0x21,
+//           "commandQualifier":128,
+//           "options":{
+//             "responseNeeded": false,
+//             "text":"1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 "
+//           }
+//          };
+         handleSTKCommand(cmd);
+       }, 50000);
+    });
   }
 })();
