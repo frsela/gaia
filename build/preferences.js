@@ -24,7 +24,7 @@ Gaia.webapps.forEach(function (webapp) {
 prefs.push(["network.http.max-connections-per-server", 15]);
 
 // for https://bugzilla.mozilla.org/show_bug.cgi?id=811605 to let user know what prefs is for ril debugging
-prefs.push(["ril.debugging.enabled", false]);
+prefs.push(["ril.debugging.enabled", true]);
 
 if (LOCAL_DOMAINS) {
   prefs.push(["network.dns.localDomains", domains.join(",")]);
