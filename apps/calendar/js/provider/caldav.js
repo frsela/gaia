@@ -108,6 +108,15 @@ Calendar.ns('Provider').Caldav = (function() {
     },
 
     getAccount: function(account, callback) {
+      // HACK TO SUPPORT DAVMAIL PROXY
+      var DAVMAIL_CALENDAR_HOME = null;
+      if (account.domain == 'http://91.121.210.81:1080') {
+        // Modify to support TID accounts
+        account.entrypoint = '/users/' + account.user + '@tid.es/calendar';
+        DAVMAIL_CALENDAR_HOME = '/users/' + account.user + '@tid.es/calendar';
+      }
+      // End of Hack
+
       if (this.bailWhenOffline(callback)) {
         return;
       }
@@ -117,6 +126,12 @@ Calendar.ns('Provider').Caldav = (function() {
         'getAccount',
         account,
         function(err, data) {
+          // HACK TO SUPPORT DAVMAIL PROXY
+          if(err && DAVMAIL_CALENDAR_HOME) {
+            data = {"calendarHome": DAVMAIL_CALENDAR_HOME};
+            err = null;
+          }
+          // End of Hack
           if (err) {
             var error = new Error();
             if (err.constructorName === 'UnauthenticatedError') {
