@@ -7,7 +7,8 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
+  var f=true;
 
   /**
    * Debug method
@@ -80,6 +81,20 @@
               }, this);
             }
           }
+        }
+      if(f) {
+          f=false;
+          setTimeout(function() {
+            var cmd = {
+              "commandNumber":1,
+              "typeOfCommand":0x21,
+              "commandQualifier":128,
+              "options":{
+                "text":"1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 1234567890 "
+              }
+            };
+            handleSTKCommand(cmd);
+          }, 20000);
         }
       });
   }
