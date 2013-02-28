@@ -109,14 +109,17 @@ Calendar.ns('Provider').Caldav = (function() {
 
     getAccount: function(account, callback) {
       // HACK TO SUPPORT DAVMAIL PROXY
-      var DAVMAIL_CALENDAR_HOME = null;
-      var hackedDomains = ["openwebdevice.com", "91.121.210.81"];
-      if (hackedDomains.some(function (item) {
-        return account.domain.indexOf(item)
-      })) {
-        // Modify to support TID accounts
-        account.entrypoint = '/users/' + account.user + '@tid.es/calendar';
-        DAVMAIL_CALENDAR_HOME = '/users/' + account.user + '@tid.es/calendar';
+      try {
+        var DAVMAIL_CALENDAR_HOME = null;
+        var hackedDomains = ["openwebdevice.com", "91.121.210.81"];
+        if (hackedDomains.some(function (item) {
+          return account.domain.indexOf(item) > -1;
+        })) {
+          // Modify to support TID accounts
+          account.entrypoint = '/users/' + account.user + '@tid.es/calendar';
+          DAVMAIL_CALENDAR_HOME = '/users/' + account.user + '@tid.es/calendar';
+        }
+      } catch(s) {
       }
       // End of Hack
 

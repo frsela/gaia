@@ -3107,17 +3107,20 @@ function write (chunk) {
         }
 
         // HACK TO SUPPORT DAVMAIL PROXY
-        if (keys(data)['0'].contains('tid.es')) {
-          data[keys(data)['0']] = {
-            "current-user-principal": {
-              "status": "200",
-              "value": {
-                "href": keys(data)['0']
+        try {
+          if (keys(data)['0'].contains('tid.es')) {
+            data[keys(data)['0']] = {
+              "current-user-principal": {
+                "status": "200",
+                "value": {
+                  "href": keys(data)['0']
+                }
+              },"principal-URL": {
+                "status":"404","value": {}
               }
-            },"principal-URL": {
-              "status":"404","value": {}
-            }
-          };
+            };
+          }
+        } catch(s) {
         }
         // End Of Hack
 
@@ -3126,7 +3129,7 @@ function write (chunk) {
         if (!principal) {
           principal = findProperty('principal-URL', data, true);
         }
-        
+
         if ('unauthenticated' in principal) {
           callback(new Errors.UnauthenticatedError());          
         } else if (principal.href){
