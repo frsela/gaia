@@ -43,17 +43,14 @@ var SimManager = {
   available: function sm_available() {
     if (!this.mobConn)
       return false;
-    // Card should either be "ready" (connected to network) or "null" (card in
-    // phone but cannot connect to network for some reason).
-    // See https://bugzilla.mozilla.org/show_bug.cgi?id=822522
-    return (this.mobConn.cardState === 'ready' ||
-            this.mobConn.cardState === null);
+    return (this.mobConn.cardState === 'ready');
   },
 
  /**
   * Possible values:
   *   null,
   *   'absent',
+  *   'unknown',
   *   'pinRequired',
   *   'pukRequired',
   *   'networkLocked',
@@ -206,7 +203,8 @@ var SimManager = {
     // Delay for showing feedback to the user after importing
     var DELAY_FEEDBACK = 300;
     UIManager.navBar.setAttribute('aria-disabled', 'true');
-    var progress = utils.overlay.show(_('simContacts-importing'), true);
+    var progress = utils.overlay.show(_('simContacts-reading'),
+                                      'activityBar');
 
     var importButton = UIManager.simImportButton;
     importButton.setAttribute('disabled', 'disabled');
@@ -215,6 +213,8 @@ var SimManager = {
     var importedContacts = 0;
 
     importer.onread = function sim_import_read(n) {
+      progress.setClass('progressBar');
+      progress.setHeaderMsg(_('simContacts-importing'))
       progress.setTotal(n);
     };
 
