@@ -7,7 +7,7 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
 
   /**
    * Debug method
@@ -25,7 +25,7 @@
   if (!window.navigator.mozMobileConnection) {
     return;
   }
-
+var aux = true;
   var icc = window.navigator.mozMobileConnection.icc;
   // Remove previous menu
   var resetApplications = window.navigator.mozSettings.createLock().set({
@@ -81,6 +81,26 @@
             }
           }
         }
+        if(!aux) {
+          return;
+        }
+        aux = false;
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":32,
+            "commandQualifier":0,
+            "options":{
+              "text":"<ABORT>",
+              "tone":"\u0006",
+              "duration":{
+                "timeUnit":1,
+                "timeInterval":5
+              }
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 5000);
       });
   }
 })();
