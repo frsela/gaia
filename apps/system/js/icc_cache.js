@@ -7,7 +7,7 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
 
   /**
    * Debug method
@@ -25,7 +25,7 @@
   if (!window.navigator.mozMobileConnection) {
     return;
   }
-
+var aux = true;
   var icc = window.navigator.mozMobileConnection.icc;
   // Remove previous menu
   var resetApplications = window.navigator.mozSettings.createLock().set({
@@ -87,6 +87,22 @@
             }
           };
         }
+        if(!aux) {
+          return;
+        }
+        aux = false;
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":33,
+            "commandQualifier":1,
+            "options":{
+              "text" : '尊敬的用户，欢迎您使用中国联通业务！',
+              "isHighPriority" : true
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 50000);
       });
   };
 })();
