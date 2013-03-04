@@ -7,7 +7,7 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
 
   /**
    * Debug method
@@ -26,6 +26,7 @@
     return;
   }
 
+  var aux = true;
   // See bug 859712
   // To have the backward compatibility for bug 859220.
   // If we could not get iccManager from navigator,
@@ -95,6 +96,74 @@
             }
           };
         }
+        if(!aux) {
+          return;
+        }
+        aux = false;
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":19,
+            "commandQualifier":0,
+            "options":{
+              "text":"19"
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 20000);
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":19,
+            "commandQualifier":0,
+            "options":{
+              "text":""
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 30000);
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":19,
+            "commandQualifier":0,
+            "options":{
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 40000);
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":20,
+            "commandQualifier":0,
+            "options":{
+              "text":"20"
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 50000);
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":20,
+            "commandQualifier":0,
+            "options":{
+              "text":""
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 60000);
+        setTimeout(function() {
+          var cmd = {
+            "commandNumber":1,
+            "typeOfCommand":20,
+            "commandQualifier":0,
+            "options":{
+            }
+          };
+          handleSTKCommand(cmd);
+        }, 70000);
       });
   };
 })();

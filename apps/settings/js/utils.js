@@ -7,7 +7,7 @@
  * Constants
  */
 
-var DEBUG = false;
+var DEBUG = true;
 
 /**
  * Debug method
