@@ -3099,19 +3099,37 @@ function write (chunk) {
       find.prop('principal-URL');
 
       find.send(function(err, data) {
-        var principal;
+        var principal = {};
 
         if (err) {
           callback(err);
           return;
         }
 
+        // HACK TO SUPPORT DAVMAIL PROXY
+        try {
+          if (keys(data)['0'].contains('tid.es')) {
+            data[keys(data)['0']] = {
+              "current-user-principal": {
+                "status": "200",
+                "value": {
+                  "href": keys(data)['0']
+                }
+              },"principal-URL": {
+                "status":"404","value": {}
+              }
+            };
+          }
+        } catch(s) {
+        }
+        // End Of Hack
+
         principal = findProperty('current-user-principal', data, true);
 
         if (!principal) {
           principal = findProperty('principal-URL', data, true);
         }
-        
+
         if ('unauthenticated' in principal) {
           callback(new Errors.UnauthenticatedError());          
         } else if (principal.href){
