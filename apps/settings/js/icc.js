@@ -691,6 +691,7 @@
           input.value);
         input.value = input.value.replace('(','');
         input.value = input.value.replace(')','');
+        input.value = input.value.replace('-','');
         console.log('TEL keypad. Final entry: ' + input.value);
       }
       button.disabled = !checkInputLengthValid(input.value.length,
