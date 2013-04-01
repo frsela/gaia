@@ -84,10 +84,6 @@
     icc.addEventListener('stkcommand', function do_handleSTKCmd(event) {
       handleSTKCommand(event.command);
     });
-    window.addEventListener('stkasynccommand',
-      function do_handleAsyncSTKCmd(event) {
-        handleSTKCommand(event.detail.command);
-      });
 
     /**
      * Open STK main application
