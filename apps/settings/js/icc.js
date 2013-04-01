@@ -268,7 +268,6 @@
       case icc.STK_CMD_SEND_SMS:
       case icc.STK_CMD_SEND_SS:
       case icc.STK_CMD_SEND_USSD:
-      case icc.STK_CMD_SEND_DTMF:
         debug(' STK:Send message: ', command);
         iccLastCommandProcessed = true;
         responseSTKCommand({
@@ -278,6 +277,32 @@
           debug('display text' + options.text);
           command.options.userClear = true;
           displayText(command);
+        } else if (options.text != undefined){
+          alert(_(
+            'operatorService-alertMessage-defaultmessage'));
+        }
+        break;
+
+      case icc.STK_CMD_SEND_DTMF:
+        debug(' STK:Send DTMF message: ', command);
+        var _confirm = true;
+        if (options.text) {
+          debug('display text' + options.text);
+          command.options.userClear = true;
+          displayText(command);
+        } else {
+          _confirm = confirm(_(
+            'operatorService-confirmMessage-defaultmessage'));
+        }
+        iccLastCommandProcessed = true;
+        if (_confirm) {
+          responseSTKCommand({
+            resultCode: icc.STK_RESULT_OK
+          });
+        } else {
+          responseSTKCommand({
+            resultCode: icc.STK_RESULT_UICC_SESSION_TERM_BY_USER
+          });
         }
         break;
 
