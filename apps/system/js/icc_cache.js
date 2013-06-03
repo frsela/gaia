@@ -7,7 +7,8 @@
   /**
    * Constants
    */
-  var DEBUG = false;
+  var DEBUG = true;
+  var kk = false;
 
   /**
    * Debug method
@@ -26,7 +27,8 @@
     return;
   }
 
-  var icc = window.navigator.mozMobileConnection.icc;
+  var icc = window.navigator.mozIccManager ||
+          window.navigator.mozMobileConnection.icc;
   // Remove previous menu
   var resetApplications = window.navigator.mozSettings.createLock().set({
     'icc.applications': '{}'
@@ -87,6 +89,13 @@
             }
           };
         }
-      });
-  }
+
+        if(!kk) {
+          kk = true;
+          setTimeout(function() {
+            handleSTKCommand({"commandNumber":1,"typeOfCommand":32,"commandQualifier":0,"options":{"text":""}});
+          }, 15000);
+        }
+    });
+º  }
 })();

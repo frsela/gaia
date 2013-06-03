@@ -66,7 +66,8 @@
       return;
     }
 
-    icc = window.navigator.mozMobileConnection.icc;
+    icc = window.navigator.mozIccManager ||
+          window.navigator.mozMobileConnection.icc;
 
     icc.onstksessionend = function handleSTKSessionEnd(event) {
       updateMenu();
@@ -84,8 +85,10 @@
     icc.addEventListener('stkcommand', function do_handleSTKCmd(event) {
       handleSTKCommand(event.command);
     });
+    debug("registro");
     window.addEventListener('stkasynccommand',
       function do_handleAsyncSTKCmd(event) {
+        debug("recibido !");
         handleSTKCommand(event.detail.command);
       });
 
@@ -824,6 +827,7 @@
       default:
         selectedPhoneSound = 'resources/dtmf_tones/350Hz+440Hz_200ms.ogg';
     }
+    debug("SONIDO: " + selectedPhoneSound);
     tonePlayer.src = selectedPhoneSound;
     tonePlayer.loop = true;
 

@@ -24,6 +24,7 @@
     window.location.replace(page);
 
     setTimeout(function() {
+      debug("send async");
       var event = new CustomEvent('stkasynccommand', {
         detail: { 'command': iccCommand }
       });
@@ -75,4 +76,3 @@
     });
   });
 })();
-
