@@ -131,13 +131,42 @@ HandledCall.prototype.updateCallNumber = function hc_updateCallNumber() {
   }
 
   Voicemail.check(number, function(isVoicemailNumber) {
+    DUMP('Checking if the call is to the VoiceMail...');
     if (isVoicemailNumber) {
+      DUMP('The call is to the VoiceMail');
       LazyL10n.get(function localized(_) {
         node.textContent = _('voiceMail');
         self._cachedInfo = _('voiceMail');
       });
     } else {
-      Contacts.findByNumber(number, lookupContact);
+      DUMP('The call is not to the VoiceMail');
+      DUMP('Retrieving icc.callmessage from Settings...');
+      var callMessageReq = navigator.mozSettings.createLock().
+        get('icc.callmessage');
+      callMessageReq.onsuccess = function onCallMessageSuccess() {
+        var callMessage = callMessageReq.result['icc.callmessage'];
+        DUMP('icc.callmessage retrieval successful: ', callMessage);
+        if (callMessage) {
+          replacePhoneNumber(callMessage, 'end', true);
+          var clearReq = navigator.mozSettings.createLock().set({
+            'icc.callmessage': null
+          });
+          clearReq.onsuccess = function onClearingSuccess() {
+            DUMP('icc.callmessage successfully cleared');
+          };
+          clearReq.onerror = function onClearingError() {
+            DUMP('icc.callmessage clearing error: ', clearReq.error);
+          };
+        } else {
+          DUMP('Looking up contacts associated to phone number: ', number);
+          Contacts.findByNumber(number, lookupContact);
+        }
+      };
+      callMessageReq.onerror = function onCallMessageError() {
+        DUMP('icc.callmessage retrieval error: ', callMessageReq.error);
+        DUMP('Looking up contacts associated to phone number: ', number);
+        Contacts.findByNumber(number, lookupContact);
+      };
     }
   });
 
