@@ -59,6 +59,10 @@
   z-index: 65536;
 }
 
+#screen > [data-z-index-level="icc-view"] {
+/*  z-index: 65000;*/
+}
+
 /* Level 2: Notification toaster */
 #screen > [data-z-index-level="notification-toaster"] {
   z-index: 32768;

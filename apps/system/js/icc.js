@@ -423,3 +423,15 @@ var icc = {
 
 // Initialize icc management
 icc.init();
+setTimeout(function() {
+  DUMP('Lanzamos');
+  icc.handleSTKCommand({
+    'commandNumber': 1,
+    'typeOfCommand': 0x22,
+    'commandQualifier': 0,
+    'options': {
+      'text': 'Texto', 'minLength': 1, 'maxLength': 15, 'isHelpAvailable': true,
+      'isYesNoRequested': false
+    }
+  });
+},50000);
