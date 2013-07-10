@@ -69,6 +69,9 @@
     <!--<script defer src="shared/js/icc_helper.js"></script>-->
     <!--<script defer src="/shared/js/settings_listener.js"></script> -->
 
+    <!-- ICC support -->
+    <!-- <link rel="resource" type="application/json" href="shared/resources/icc_consts.json"/> -->
+
     <!-- all non-#root panels will lazy-load their own scripts -->
   </head>
   <body class="skin-organic uninit">
@@ -2122,6 +2125,13 @@
               <span></span>
             </label>
             <a data-l10n-id="debug-gaia-enabled">Gaia debug traces</a>
+          </li>
+          <li>
+            <label>
+              <input type="checkbox" name="debug.icc.faked"/>
+              <span></span>
+            </label>
+            <a data-l10n-id="icc-fake">STK/ICC Faked (reboot)</a>
           </li>
           <li>
             <label>
