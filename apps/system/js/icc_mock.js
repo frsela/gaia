@@ -142,6 +142,24 @@ var icc_mock = (function() {
      * @see MozStkResponse for the detail of response.
      */
     sendStkResponse: function(command, response) {
+      function sendToParentMenu() {
+        var parent = 0;
+        if (this._lastMenuOptionSent) {
+          parent = this.iccMenu['subMenus'][this._lastMenuOptionSent].parent || 0;
+        }
+        if (!parent) {
+          this.sendStkSessionEnd();
+          return;
+        }
+        _subMenu = this.iccMenu['subMenus'][parent];
+        this._lastMenuOptionSent = parent;
+        this.emitCommand(
+          this.createCommand(
+            _subMenu.cmd,
+            _subMenu.opt
+          ));
+      }
+
       debug('Response received: ',response);
       debug('Command: ', command);
       var _subMenu = null;
@@ -168,23 +186,11 @@ var icc_mock = (function() {
         debug('Response not implemented');
         break;
       case this.STK_RESULT_BACKWARD_MOVE_BY_USER:
-        var parent = 0;
-        if (this._lastMenuOptionSent) {
-          parent = this.iccMenu['subMenus'][this._lastMenuOptionSent].parent || 0;
-        }
-        if (!parent) {
-          this.sendStkSessionEnd();
-          return;
-        }
-        _subMenu = this.iccMenu['subMenus'][parent];
-        this._lastMenuOptionSent = parent;
-        this.emitCommand(
-          this.createCommand(
-            _subMenu.cmd,
-            _subMenu.opt
-          ));
+        sendToParentMenu();
         break;
       case this.STK_RESULT_NO_RESPONSE_FROM_USER:
+        sendToParentMenu();
+        break;
       case this.STK_RESULT_HELP_INFO_REQUIRED:
       case this.STK_RESULT_USSD_SS_SESSION_TERM_BY_USER:
       case this.STK_RESULT_TERMINAL_CRNTLY_UNABLE_TO_PROCESS:
@@ -223,6 +229,16 @@ var icc_mock = (function() {
       helpRequested && debug('Help requested');
 
       var _subMenu = this.iccMenu['subMenus'][itemIdentifier];
+      if (helpRequested) {
+        this.emitCommand(
+          this.createCommand(
+            this.STK_CMD_DISPLAY_TEXT,
+            {
+              "text": _subMenu.help || "No help provided"
+            }
+          ));
+        return;
+      }
       this.emitCommand(
         this.createCommand(
           _subMenu.cmd,
