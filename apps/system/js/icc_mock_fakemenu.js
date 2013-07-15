@@ -246,38 +246,214 @@ function getICCFakeMenu(iccObject) {
 
       // STK_CMD_SEND_SS
       105: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
-          "text": "Command not yet mocked"
+          "title": "STK_CMD_SEND_SS",
+          "defaultItem": 10501,
+          "items": [{
+            "identifier": 10501,
+            "textSend SS with confirm message"
+          },{
+            "identifier": 10502,
+            "text": "empty confirm message"
+          },{
+            "identifier": 10503,
+            "text": "null confirm message"
+          },{
+            "identifier": 10504,
+            "text": "undefined confirm message"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
         },
         "parent": 1
+      },
+      10501: {
+        "cmd": iccObject.STK_CMD_SEND_SS,
+        "opt": {
+          "text": "A message will be sent (SS)"
+        },
+        "parent": 105
+      },
+      10502: {
+        "cmd": iccObject.STK_CMD_SEND_SS,
+        "opt": {
+          "text": ""
+        },
+        "parent": 105
+      },
+      10502: {
+        "cmd": iccObject.STK_CMD_SEND_SS,
+        "opt": {
+          "text": null
+        },
+        "parent": 105
+      },
+      10504: {
+        "cmd": iccObject.STK_CMD_SEND_SS,
+        "opt": {
+        },
+        "parent": 105
       },
 
       // STK_CMD_SEND_USSD
       106: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
-          "text": "Command not yet mocked"
+          "title": "STK_CMD_SEND_USSD",
+          "defaultItem": 10601,
+          "items": [{
+            "identifier": 10601,
+            "text": "with confirm message"
+          },{
+            "identifier": 10602,
+            "text": "empty confirm message"
+          },{
+            "identifier": 10603,
+            "text": "null confirm message"
+          },{
+            "identifier": 10604,
+            "text": "undefined confirm message"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
         },
         "parent": 1
+      },
+      10601: {
+        "cmd": iccObject.STK_CMD_SEND_USSD,
+        "opt": {
+          "text": "A message will be sent (USSD)"
+        },
+        "parent": 106
+      },
+      10602: {
+        "cmd": iccObject.STK_CMD_SEND_USSD,
+        "opt": {
+          "text": ""
+        },
+        "parent": 106
+      },
+      10602: {
+        "cmd": iccObject.STK_CMD_SEND_USSD,
+        "opt": {
+          "text": null
+        },
+        "parent": 106
+      },
+      10604: {
+        "cmd": iccObject.STK_CMD_SEND_USSD,
+        "opt": {
+        },
+        "parent": 106
       },
 
       // STK_CMD_SEND_SMS
       107: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
-          "text": "Command not yet mocked"
+          "title": "STK_CMD_SEND_SMS",
+          "defaultItem": 10701,
+          "items": [{
+            "identifier": 10701,
+            "text": "with confirm message"
+          },{
+            "identifier": 10702,
+            "text": "empty confirm message"
+          },{
+            "identifier": 10703,
+            "text": "null confirm message"
+          },{
+            "identifier": 10704,
+            "text": "undefined confirm message"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
         },
         "parent": 1
+      },
+      10701: {
+        "cmd": iccObject.STK_CMD_SEND_SMS,
+        "opt": {
+          "text": "A message will be sent (SMS)"
+        },
+        "parent": 107
+      },
+      10702: {
+        "cmd": iccObject.STK_CMD_SEND_SMS,
+        "opt": {
+          "text": ""
+        },
+        "parent": 107
+      },
+      10702: {
+        "cmd": iccObject.STK_CMD_SEND_SMS,
+        "opt": {
+          "text": null
+        },
+        "parent": 107
+      },
+      10704: {
+        "cmd": iccObject.STK_CMD_SEND_SMS,
+        "opt": {
+        },
+        "parent": 107
       },
 
       // STK_CMD_SEND_DTMF
       108: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
-          "text": "Command not yet mocked"
+          "title": "STK_CMD_SEND_DTMF",
+          "defaultItem": 10801,
+          "items": [{
+            "identifier": 10801,
+            "text": "with confirm message"
+          },{
+            "identifier": 10802,
+            "text": "empty confirm message"
+          },{
+            "identifier": 10803,
+            "text": "null confirm message"
+          },{
+            "identifier": 10804,
+            "text": "undefined confirm message"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
         },
         "parent": 1
+      },
+      10801: {
+        "cmd": iccObject.STK_CMD_SEND_DTMF,
+        "opt": {
+          "text": "A message will be sent (DTMF)"
+        },
+        "parent": 108
+      },
+      10802: {
+        "cmd": iccObject.STK_CMD_SEND_DTMF,
+        "opt": {
+          "text": ""
+        },
+        "parent": 108
+      },
+      10802: {
+        "cmd": iccObject.STK_CMD_SEND_DTMF,
+        "opt": {
+          "text": null
+        },
+        "parent": 108
+      },
+      10804: {
+        "cmd": iccObject.STK_CMD_SEND_DTMF,
+        "opt": {
+        },
+        "parent": 108
       },
 
       // STK_CMD_LAUNCH_BROWSER
@@ -497,7 +673,7 @@ function getICCFakeMenu(iccObject) {
           "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
           "help": "Next Action Indicator test",
           "opt": {
-            "text": "The NAI text should be displayed after the menu string"
+            "text": "The NAI text should be displayed bellow the menu string"
           },
           "parent": 0
       }

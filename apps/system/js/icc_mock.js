@@ -142,7 +142,7 @@ var icc_mock = (function() {
      * @see MozStkResponse for the detail of response.
      */
     sendStkResponse: function(command, response) {
-      function sendToParentMenu() {
+      function sendToParent() {
         var parent = 0;
         if (this._lastMenuOptionSent) {
           parent = this.iccMenu['subMenus'][this._lastMenuOptionSent].parent || 0;
@@ -186,10 +186,10 @@ var icc_mock = (function() {
         debug('Response not implemented');
         break;
       case this.STK_RESULT_BACKWARD_MOVE_BY_USER:
-        sendToParentMenu();
+        sendToParent();
         break;
       case this.STK_RESULT_NO_RESPONSE_FROM_USER:
-        sendToParentMenu();
+        sendToParent();
         break;
       case this.STK_RESULT_HELP_INFO_REQUIRED:
       case this.STK_RESULT_USSD_SS_SESSION_TERM_BY_USER:
