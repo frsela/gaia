@@ -864,20 +864,187 @@ function getICCFakeMenu(iccObject) {
 
       // STK_CMD_GET_INKEY
       112: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
-          "text": "Command not yet mocked"
+          "title": "STK_CMD_GET_INKEY",
+          "defaultItem": 11201,
+          "items": [{
+            "identifier": 11201,
+            "text": "Length 1-15"
+          },{
+            "identifier": 11202,
+            "text": "Yes/No requested"
+          },{
+            "identifier": 11203,
+            "text": "Long text"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
         },
         "parent": 1
+      },
+      11201: {
+        "cmd": iccObject.STK_CMD_GET_INKEY,
+        "opt": {
+          "text": "Enter data",
+          "minLength": 1,
+          "maxLength": 15,
+          "isHelpAvailable": true,
+          "isYesNoRequested": false
+        },
+        "parent": 112
+      },
+      11202: {
+        "cmd": iccObject.STK_CMD_GET_INKEY,
+        "opt": {
+          "text": "To be or not to be...",
+          "isHelpAvailable": false,
+          "isYesNoRequested": true
+        },
+        "parent": 112
+      },
+      11203: {
+        "cmd": iccObject.STK_CMD_GET_INKEY,
+        "opt": {
+          "text": "Very long message ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 EOF",
+          "isHelpAvailable": true,
+          "isYesNoRequested": true
+        },
+        "parent": 112
       },
 
       // STK_CMD_GET_INPUT
       113: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
-          "text": "Command not yet mocked"
+          "title": "STK_CMD_GET_INPUT",
+          "defaultItem": 11301,
+          "items": [{
+            "identifier": 11301,
+            "text": "Length 0-30"
+          },{
+            "identifier": 11302,
+            "text": "Yes/No requested"
+          },{
+            "identifier": 11303,
+            "text": "Long text"
+          },{
+            "identifier": 11304,
+            "text": "Alphabet keyboard"
+          },{
+            "identifier": 11305,
+            "text": "Numeric keyboard"
+          },{
+            "identifier": 11306,
+            "text": "Hidden"
+          },{
+            "identifier": 11307,
+            "text": "Password"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
         },
         "parent": 1
+      },
+      11301: {
+        "cmd": iccObject.STK_CMD_GET_INPUT,
+        "opt": {
+          "text": "Enter data",
+          "minLength": 0,
+          "maxLength": 30,
+          "isHelpAvailable": false,
+          "isYesNoRequested": false
+        },
+        "parent": 113
+      },
+      11302: {
+        "cmd": iccObject.STK_CMD_GET_INPUT,
+        "opt": {
+          "text": "To be or not to be...",
+          "isHelpAvailable": true,
+          "isYesNoRequested": true
+        },
+        "parent": 113
+      },
+      11303: {
+        "cmd": iccObject.STK_CMD_GET_INPUT,
+        "opt": {
+          "text": "Very long message ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 " +
+            "1234567890 1234567890 1234567890 1234567890 1234567890 EOF",
+          "isHelpAvailable": true,
+          "isYesNoRequested": false
+        },
+        "parent": 113
+      },
+      11304: {
+        "cmd": iccObject.STK_CMD_GET_INPUT,
+        "opt": {
+          "text": "Alphabet",
+          "minLength": 0,
+          "maxLength": 30,
+          "isHelpAvailable": false,
+          "isYesNoRequested": false,
+          "isAlphabet": true
+        },
+        "parent": 113
+      },
+      11305: {
+        "cmd": iccObject.STK_CMD_GET_INPUT,
+        "opt": {
+          "text": "Numeric",
+          "minLength": 0,
+          "maxLength": 10,
+          "isHelpAvailable": false,
+          "isYesNoRequested": false,
+
+        },
+        "parent": 113
+      },
+      11306: {
+        "cmd": iccObject.STK_CMD_GET_INPUT,
+        "opt": {
+          "text": "Hidden",
+          "hidden": true,
+          "isYesNoRequested": true
+        },
+        "parent": 113
+      },
+      11307: {
+        "cmd": iccObject.STK_CMD_GET_INPUT,
+        "opt": {
+          "text": "Password",
+          "minLength": 4,
+          "maxLength": 15,
+          "isHelpAvailable": false,
+          "isYesNoRequested": false,
+          "hideInput": true
+        },
+        "parent": 113
       },
 
       // STK_CMD_SELECT_ITEM
