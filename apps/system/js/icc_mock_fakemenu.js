@@ -11,6 +11,9 @@ function getICCFakeMenu(iccObject) {
         "text": "NAI menu (Bug #874308)"
       },{
         "identifier": 3,
+        "text": "STK Groups"
+      },{
+        "identifier": 4,
         "text": "About..."
       }]
     },
@@ -22,59 +25,59 @@ function getICCFakeMenu(iccObject) {
               "title": "STK Commands Tests",
               "defaultItem": 101,
               "items": [{
-                    "identifier": 101,
-                    "text": "STK_CMD_REFRESH"
-                  },{
-                    "identifier": 102,
-                    "text": "STK_CMD_POLL_INTERVAL"
-                  },{
-                    "identifier": 103,
-                    "text": "STK_CMD_POLL_OFF"
-                  },{
-                    "identifier": 104,
-                    "text": "STK_CMD_SET_UP_EVENT_LIST"
-                  },{
-                    "identifier": 105,
-                    "text": "STK_CMD_SEND_SS"
-                  },{
-                    "identifier": 106,
-                    "text": "STK_CMD_SEND_USSD"
-                  },{
-                    "identifier": 107,
-                    "text": "STK_CMD_SEND_SMS"
-                  },{
-                    "identifier": 108,
-                    "text": "STK_CMD_SEND_DTMF"
-                  },{
-                    "identifier": 109,
-                    "text": "STK_CMD_LAUNCH_BROWSER"
-                  },{
-                    "identifier": 110,
-                    "text": "STK_CMD_PLAY_TONE"
-                  },{
-                    "identifier": 111,
-                    "text": "STK_CMD_DISPLAY_TEXT"
-                  },{
-                    "identifier": 112,
-                    "text": "STK_CMD_GET_INKEY"
-                  },{
-                    "identifier": 113,
-                    "text": "STK_CMD_GET_INPUT"
-                  },{
-                    "identifier": 114,
-                    "text": "STK_CMD_SELECT_ITEM"
-                  },{
-                    "identifier": 115,
-                    "text": "STK_CMD_SET_UP_MENU"
-                  },{
-                    "identifier": 116,
-                    "text": "STK_CMD_PROVIDE_LOCAL_INFO"
-                  },{
-                    "identifier": 117,
-                    "text": "STK_CMD_TIMER_MANAGEMENT"
-                  },{
-                    "identifier": 118,
-                    "text": "STK_CMD_SET_UP_IDLE_MODE_TEXT"
+                "identifier": 101,
+                "text": "STK_CMD_REFRESH"
+              },{
+                "identifier": 102,
+                "text": "STK_CMD_POLL_INTERVAL"
+              },{
+                "identifier": 103,
+                "text": "STK_CMD_POLL_OFF"
+              },{
+                "identifier": 104,
+                "text": "STK_CMD_SET_UP_EVENT_LIST"
+              },{
+                "identifier": 105,
+                "text": "STK_CMD_SEND_SS"
+              },{
+                "identifier": 106,
+                "text": "STK_CMD_SEND_USSD"
+              },{
+                "identifier": 107,
+                "text": "STK_CMD_SEND_SMS"
+              },{
+                "identifier": 108,
+                "text": "STK_CMD_SEND_DTMF"
+              },{
+                "identifier": 109,
+                "text": "STK_CMD_LAUNCH_BROWSER"
+              },{
+                "identifier": 110,
+                "text": "STK_CMD_PLAY_TONE"
+              },{
+                "identifier": 111,
+                "text": "STK_CMD_DISPLAY_TEXT"
+              },{
+                "identifier": 112,
+                "text": "STK_CMD_GET_INKEY"
+              },{
+                "identifier": 113,
+                "text": "STK_CMD_GET_INPUT"
+              },{
+                "identifier": 114,
+                "text": "STK_CMD_SELECT_ITEM"
+              },{
+                "identifier": 115,
+                "text": "STK_CMD_SET_UP_MENU"
+              },{
+                "identifier": 116,
+                "text": "STK_CMD_PROVIDE_LOCAL_INFO"
+              },{
+                "identifier": 117,
+                "text": "STK_CMD_TIMER_MANAGEMENT"
+              },{
+                "identifier": 118,
+                "text": "STK_CMD_SET_UP_IDLE_MODE_TEXT"
               }]
           },
           "parent": 0
@@ -168,6 +171,38 @@ function getICCFakeMenu(iccObject) {
       },
 
       3: {
+          "cmd": iccObject.STK_CMD_SELECT_ITEM,
+          "help": "Shows a list of STK groups to be tested",
+          "opt": {
+              "title": "Group STK Commands Tests",
+              "defaultItem": 301,
+              "items": [{
+                "identifier": 301,
+                "text": "IDLE"
+              },{
+                "identifier": 302,
+                "text": "POLL, LOCAL and TIMER"
+              },{
+                "identifier": 104,
+                "text": "EVENTS"
+              },{
+                "identifier": 303,
+                "text": "MESSAGES"
+              },{
+                "identifier": 109,
+                "text": "BROWSER"
+              },{
+                "identifier": 110,
+                "text": "TONES"
+              },{
+                "identifier": 304,
+                "text": "DISPLAYS and INPUTS"
+              }]
+          },
+          "parent": 0
+      },
+
+      4: {
           "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
           "help": "Shows the about page",
           "opt": {
@@ -935,7 +970,96 @@ function getICCFakeMenu(iccObject) {
             "text": "The NAI text should be displayed bellow the menu string"
           },
           "parent": 0
-      }
+      },
+
+      // Menu 3: Commands by groups
+      301: {
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
+        "opt": {
+          "title": "IDLE",
+          "defaultItem": 118,
+          "items": [{
+            "identifier": 118,
+            "text": "STK_CMD_SET_UP_IDLE_MODE_TEXT"
+          },{
+            "identifier": 101,
+            "text": "STK_CMD_REFRESH"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
+        },
+        "parent": 3
+      },
+      302: {
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
+        "opt": {
+          "title": "POLL, LOCAL and TIMER",
+          "defaultItem": 102,
+          "items": [{
+            "identifier": 102,
+            "text": "STK_CMD_POLL_INTERVAL"
+          },{
+            "identifier": 103,
+            "text": "STK_CMD_POLL_OFF"
+          },{
+            "identifier": 116,
+            "text": "STK_CMD_PROVIDE_LOCAL_INFO"
+          },{
+            "identifier": 117,
+            "text": "STK_CMD_TIMER_MANAGEMENT"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
+        },
+        "parent": 3
+      },
+      303: {
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
+        "opt": {
+          "title": "MESSAGES",
+          "defaultItem": 102,
+          "items": [{
+            "identifier": 105,
+            "text": "STK_CMD_SEND_SS"
+          },{
+            "identifier": 106,
+            "text": "STK_CMD_SEND_USSD"
+          },{
+            "identifier": 107,
+            "text": "STK_CMD_SEND_SMS"
+          },{
+            "identifier": 108,
+            "text": "STK_CMD_SEND_DTMF"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
+        },
+        "parent": 3
+      },
+      304: {
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
+        "opt": {
+          "title": "DISPLAYS and INPUTS",
+          "defaultItem": 102,
+          "items": [{
+            "identifier": 111,
+            "text": "STK_CMD_DISPLAY_TEXT"
+          },{
+            "identifier": 112,
+            "text": "STK_CMD_GET_INKEY"
+          },{
+            "identifier": 113,
+            "text": "STK_CMD_GET_INPUT"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
+        },
+        "parent": 3
+      },
 
     }
   };
