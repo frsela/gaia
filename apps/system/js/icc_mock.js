@@ -10,7 +10,7 @@ var icc_mock = (function() {
 
   function icc_mock() {
     var _commandNumber = 1;
-    var _lastMenuOptionSent = null;
+    var _lastMenuOptionSent = 0;
   }
 
   icc_mock.prototype = {
@@ -127,6 +127,27 @@ var icc_mock = (function() {
       });
     },
 
+    sendToParent: function() {
+      DUMP('Go to parent... ' + this._lastMenuOptionSent);
+      var parent = 0;
+      if (this._lastMenuOptionSent) {
+        parent = this.iccMenu['subMenus'][this._lastMenuOptionSent].parent || 0;
+      }
+      DUMP('parent='+parent);
+      if (!parent) {
+        this.sendStkSessionEnd();
+        return;
+      }
+      var _subMenu = this.iccMenu['subMenus'][parent];
+      DUMP('Menu='+subMenu);
+      this._lastMenuOptionSent = parent;
+      this.emitCommand(
+        this.createCommand(
+          _subMenu.cmd,
+          _subMenu.opt
+        ));
+    },
+
     /////////////////////////////////////////////////////////////////////////////
     // Methods (from nsIDOMIccManager.idl)
     /////////////////////////////////////////////////////////////////////////////
@@ -142,24 +163,6 @@ var icc_mock = (function() {
      * @see MozStkResponse for the detail of response.
      */
     sendStkResponse: function(command, response) {
-      function sendToParent() {
-        var parent = 0;
-        if (this._lastMenuOptionSent) {
-          parent = this.iccMenu['subMenus'][this._lastMenuOptionSent].parent || 0;
-        }
-        if (!parent) {
-          this.sendStkSessionEnd();
-          return;
-        }
-        _subMenu = this.iccMenu['subMenus'][parent];
-        this._lastMenuOptionSent = parent;
-        this.emitCommand(
-          this.createCommand(
-            _subMenu.cmd,
-            _subMenu.opt
-          ));
-      }
-
       debug('Response received: ',response);
       debug('Command: ', command);
       var _subMenu = null;
@@ -171,7 +174,9 @@ var icc_mock = (function() {
         } else {
           _subMenu = this.iccMenu['subMenus'][this._lastMenuOptionSent];
         }
-        this._lastMenuOptionSent = response.itemIdentifier;
+        if (_subMenu.cmd == icc.STK_CMD_SELECT_ITEM) {
+          this._lastMenuOptionSent = response.itemIdentifier;
+        }
         this.emitCommand(
           this.createCommand(
             _subMenu.cmd,
@@ -184,12 +189,10 @@ var icc_mock = (function() {
       case this.STK_RESULT_PRFRMD_LIMITED_SERVICE:
       case this.STK_RESULT_UICC_SESSION_TERM_BY_USER:
         debug('Response not implemented');
-        break;
+        this.sendToParent();
       case this.STK_RESULT_BACKWARD_MOVE_BY_USER:
-        sendToParent();
-        break;
       case this.STK_RESULT_NO_RESPONSE_FROM_USER:
-        sendToParent();
+        this.sendToParent();
         break;
       case this.STK_RESULT_HELP_INFO_REQUIRED:
       case this.STK_RESULT_USSD_SS_SESSION_TERM_BY_USER:
@@ -210,9 +213,11 @@ var icc_mock = (function() {
       case this.STK_RESULT_USIM_CALL_CONTROL_PERMANENT:
       case this.STK_RESULT_BIP_ERROR:
         debug('Response not implemented');
+        this.sendToParent();
         break;
       default:
         debug('Response not recognized');
+        this.sendToParent();
       }
     },
 
