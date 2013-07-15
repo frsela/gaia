@@ -50,27 +50,30 @@ function getICCFakeMenu(iccObject) {
                     "text": "STK_CMD_LAUNCH_BROWSER"
                   },{
                     "identifier": 110,
-                    "text": "STK_CMD_DISPLAY_TEXT"
+                    "text": "STK_CMD_PLAY_TONE"
                   },{
                     "identifier": 111,
-                    "text": "STK_CMD_GET_INKEY"
+                    "text": "STK_CMD_DISPLAY_TEXT"
                   },{
                     "identifier": 112,
-                    "text": "STK_CMD_GET_INPUT"
+                    "text": "STK_CMD_GET_INKEY"
                   },{
                     "identifier": 113,
-                    "text": "STK_CMD_SELECT_ITEM"
+                    "text": "STK_CMD_GET_INPUT"
                   },{
                     "identifier": 114,
-                    "text": "STK_CMD_SET_UP_MENU"
+                    "text": "STK_CMD_SELECT_ITEM"
                   },{
                     "identifier": 115,
-                    "text": "STK_CMD_PROVIDE_LOCAL_INFO"
+                    "text": "STK_CMD_SET_UP_MENU"
                   },{
                     "identifier": 116,
-                    "text": "STK_CMD_TIMER_MANAGEMENT"
+                    "text": "STK_CMD_PROVIDE_LOCAL_INFO"
                   },{
                     "identifier": 117,
+                    "text": "STK_CMD_TIMER_MANAGEMENT"
+                  },{
+                    "identifier": 118,
                     "text": "STK_CMD_SET_UP_IDLE_MODE_TEXT"
               }]
           },
@@ -252,7 +255,7 @@ function getICCFakeMenu(iccObject) {
           "defaultItem": 10501,
           "items": [{
             "identifier": 10501,
-            "textSend SS with confirm message"
+            "text": "Send SS with confirm message"
           },{
             "identifier": 10502,
             "text": "empty confirm message"
@@ -283,7 +286,7 @@ function getICCFakeMenu(iccObject) {
         },
         "parent": 105
       },
-      10502: {
+      10503: {
         "cmd": iccObject.STK_CMD_SEND_SS,
         "opt": {
           "text": null
@@ -336,7 +339,7 @@ function getICCFakeMenu(iccObject) {
         },
         "parent": 106
       },
-      10602: {
+      10603: {
         "cmd": iccObject.STK_CMD_SEND_USSD,
         "opt": {
           "text": null
@@ -389,7 +392,7 @@ function getICCFakeMenu(iccObject) {
         },
         "parent": 107
       },
-      10702: {
+      10703: {
         "cmd": iccObject.STK_CMD_SEND_SMS,
         "opt": {
           "text": null
@@ -442,7 +445,7 @@ function getICCFakeMenu(iccObject) {
         },
         "parent": 108
       },
-      10802: {
+      10803: {
         "cmd": iccObject.STK_CMD_SEND_DTMF,
         "opt": {
           "text": null
@@ -500,24 +503,24 @@ function getICCFakeMenu(iccObject) {
         "parent": 109
       },
 
-      // STK_CMD_DISPLAY_TEXT
+      // STK_CMD_PLAY_TONE
       110: {
         "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
-          "title": "STK_CMD_DISPLAY_TEXT",
+          "title": "STK_CMD_PLAY_TONE",
           "defaultItem": 11001,
           "items": [{
             "identifier": 11001,
-            "text": "Show a simple message"
+            "text": "Vibrator, Dial tone, 10 secs"
           },{
             "identifier": 11002,
-            "text": "responseNeeded message"
+            "text": "Vibrator, called subscriber tone, 1 min"
           },{
             "identifier": 11003,
-            "text": "userClear message"
+            "text": "Vibrator, congestion tone, 20 tenth/secods"
           },{
             "identifier": 11004,
-            "text": "Show a very long message"
+            "text": "Other tones..."
           },{
             "identifier": 1,
             "text": "Return to main menu"
@@ -526,29 +529,285 @@ function getICCFakeMenu(iccObject) {
         "parent": 1
       },
       11001: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
         "opt": {
-          "text": "Simple Message text"
+          "tone": iccObject.STK_TONE_TYPE_DIAL_TONE,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "isVibrate": true,
+          "text": "Vibrator, Dial tone, 10 secs"
         },
         "parent": 110
       },
       11002: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_CALLED_SUBSCRIBER_BUSY,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_MINUTE,
+            "timeInterval": 1
+          },
+          "isVibrate": true,
+          "text": "Vibrator, called subscriber tone, 1 min"
+        },
+        "parent": 110
+      },
+      11003: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_CONGESTION,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_TENTH_SECOND,
+            "timeInterval": 10
+          },
+          "isVibrate": true,
+          "text": "Vibrator, congestion tone, 20 tenth/secods"
+        },
+        "parent": 110
+      },
+      11004: {
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
+        "opt": {
+          "title": "Select tone to test",
+          "defaultItem": 1100401,
+          "items": [{
+            "identifier": 1100401,
+            "text": "STK_TONE_TYPE_DIAL_TONE, 10 secs"
+          },{
+            "identifier": 1100402,
+            "text": "STK_TONE_TYPE_CALLED_SUBSCRIBER_BUSY, 10 secs"
+          },{
+            "identifier": 1100403,
+            "text": "STK_TONE_TYPE_CONGESTION, 10 secs"
+          },{
+            "identifier": 1100404,
+            "text": "STK_TONE_TYPE_RADIO_PATH_ACK, 10 secs"
+          },{
+            "identifier": 1100405,
+            "text": "STK_TONE_TYPE_RADIO_PATH_NOT_AVAILABLE, 10 secs"
+          },{
+            "identifier": 1100406,
+            "text": "STK_TONE_TYPE_ERROR, 10 secs"
+          },{
+            "identifier": 1100407,
+            "text": "STK_TONE_TYPE_CALL_WAITING_TONE, 10 secs"
+          },{
+            "identifier": 1100408,
+            "text": "STK_TONE_TYPE_RINGING_TONE, 10 secs"
+          },{
+            "identifier": 1100409,
+            "text": "STK_TONE_TYPE_GENERAL_BEEP, 10 secs"
+          },{
+            "identifier": 1100410,
+            "text": "STK_TONE_TYPE_POSITIVE_ACK_TONE, 10 secs"
+          },{
+            "identifier": 1100411,
+            "text": "STK_TONE_TYPE_NEGATIVE_ACK_TONE, 10 secs"
+          },{
+            "identifier": 1100412,
+            "text": "Default tone, 10 secs"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
+        },
+        "parent": 110
+      },
+      1100401: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_DIAL_TONE,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_DIAL_TONE, 10 secs"
+        },
+        "parent": 110
+      },
+      1100402: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_CALLED_SUBSCRIBER_BUSY,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_CALLED_SUBSCRIBER_BUSY, 10 secs"
+        },
+        "parent": 110
+      },
+      1100403: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_CONGESTION,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_CONGESTION, 10 secs"
+        },
+        "parent": 110
+      },
+      1100404: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_RADIO_PATH_ACK,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_RADIO_PATH_ACK, 10 secs"
+        },
+        "parent": 110
+      },
+      1100405: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_RADIO_PATH_NOT_AVAILABLE,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_RADIO_PATH_NOT_AVAILABLE, 10 secs"
+        },
+        "parent": 110
+      },
+      1100406: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_ERROR,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_ERROR, 10 secs"
+        },
+        "parent": 110
+      },
+      1100407: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_CALL_WAITING_TONE,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_CALL_WAITING_TONE, 10 secs"
+        },
+        "parent": 110
+      },
+      1100408: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_RINGING_TONE,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_RINGING_TONE, 10 secs"
+        },
+        "parent": 110
+      },
+      1100409: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_GENERAL_BEEP,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_GENERAL_BEEP, 10 secs"
+        },
+        "parent": 110
+      },
+      1100410: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_POSITIVE_ACK_TONE,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_POSITIVE_ACK_TONE, 10 secs"
+        },
+        "parent": 110
+      },
+      1100411: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "tone": iccObject.STK_TONE_TYPE_NEGATIVE_ACK_TONE,
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "STK_TONE_TYPE_NEGATIVE_ACK_TONE, 10 secs"
+        },
+        "parent": 110
+      },
+      1100412: {
+        "cmd": iccObject.STK_CMD_PLAY_TONE,
+        "opt": {
+          "duration": {
+            "timeUnit": iccObject.STK_TIME_UNIT_SECOND,
+            "timeInterval": 10
+          },
+          "text": "Defautl tone, 10 secs"
+        },
+        "parent": 110
+      },
+
+      // STK_CMD_DISPLAY_TEXT
+      111: {
+        "cmd": iccObject.STK_CMD_SELECT_ITEM,
+        "opt": {
+          "title": "STK_CMD_DISPLAY_TEXT",
+          "defaultItem": 11101,
+          "items": [{
+            "identifier": 11101,
+            "text": "Show a simple message"
+          },{
+            "identifier": 11102,
+            "text": "responseNeeded message"
+          },{
+            "identifier": 11103,
+            "text": "userClear message"
+          },{
+            "identifier": 11104,
+            "text": "Show a very long message"
+          },{
+            "identifier": 1,
+            "text": "Return to main menu"
+          }]
+        },
+        "parent": 1
+      },
+      11101: {
+        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "opt": {
+          "text": "Simple Message text"
+        },
+        "parent": 111
+      },
+      11102: {
         "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
         "opt": {
           "text": "Simple Message text with responseNeeded",
           "responseNeeded": true
         },
-        "parent": 110
+        "parent": 111
       },
-      11003: {
+      11103: {
         "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
         "opt": {
           "text": "Simple Message text with userClear",
           "userClear": true
         },
-        "parent": 110
+        "parent": 111
       },
-      11004: {
+      11104: {
         "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
         "opt": {
           "text": "Very long message ABCDEFGHIJKLMNOPQRSTUVWXYZ 1234567890 " +
@@ -565,19 +824,10 @@ function getICCFakeMenu(iccObject) {
             "1234567890 1234567890 1234567890 1234567890 1234567890 " +
             "1234567890 1234567890 1234567890 1234567890 1234567890 EOF"
         },
-        "parent": 110
+        "parent": 111
       },
 
       // STK_CMD_GET_INKEY
-      111: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
-        "opt": {
-          "text": "Command not yet mocked"
-        },
-        "parent": 1
-      },
-
-      // STK_CMD_GET_INPUT
       112: {
         "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
         "opt": {
@@ -586,8 +836,17 @@ function getICCFakeMenu(iccObject) {
         "parent": 1
       },
 
-      // STK_CMD_SELECT_ITEM
+      // STK_CMD_GET_INPUT
       113: {
+        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "opt": {
+          "text": "Command not yet mocked"
+        },
+        "parent": 1
+      },
+
+      // STK_CMD_SELECT_ITEM
+      114: {
         "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
         "opt": {
           "text": "Tested while navigating through the STK menues ;)"
@@ -596,7 +855,7 @@ function getICCFakeMenu(iccObject) {
       },
 
       // STK_CMD_SET_UP_MENU
-      114: {
+      115: {
         "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
         "opt": {
           "text": "Tested showing the Main menu in settings ;)"
@@ -605,15 +864,6 @@ function getICCFakeMenu(iccObject) {
       },
 
       // STK_CMD_PROVIDE_LOCAL_INFO
-      115: {
-        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
-        "opt": {
-          "text": "Command not yet mocked"
-        },
-        "parent": 1
-      },
-
-      // STK_CMD_TIMER_MANAGEMENT
       116: {
         "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
         "opt": {
@@ -622,17 +872,26 @@ function getICCFakeMenu(iccObject) {
         "parent": 1
       },
 
-      // STK_CMD_SET_UP_IDLE_MODE_TEXT
+      // STK_CMD_TIMER_MANAGEMENT
       117: {
+        "cmd": iccObject.STK_CMD_DISPLAY_TEXT,
+        "opt": {
+          "text": "Command not yet mocked"
+        },
+        "parent": 1
+      },
+
+      // STK_CMD_SET_UP_IDLE_MODE_TEXT
+      118: {
         "cmd": iccObject.STK_CMD_SELECT_ITEM,
         "opt": {
           "title": "STK_CMD_DISPLAY_TEXT",
-          "defaultItem": 11701,
+          "defaultItem": 11801,
           "items": [{
-            "identifier": 11701,
+            "identifier": 11801,
             "text": "Show a simple idle message"
           },{
-            "identifier": 11702,
+            "identifier": 11802,
             "text": "Show a very long message"
           },{
             "identifier": 1,
@@ -641,14 +900,14 @@ function getICCFakeMenu(iccObject) {
         },
         "parent": 1
       },
-      11701: {
+      11801: {
         "cmd": iccObject.STK_CMD_SET_UP_IDLE_MODE_TEXT,
         "opt": {
           "text": "Simple Idle Message text"
         },
-        "parent": 110
+        "parent": 118
       },
-      11702: {
+      11802: {
         "cmd": iccObject.STK_CMD_SET_UP_IDLE_MODE_TEXT,
         "opt": {
           "text": "Long Idle Message text ABCDEFGHIJKLMNOPQRSTUVWXYZ " +
@@ -665,7 +924,7 @@ function getICCFakeMenu(iccObject) {
             "1234567890 1234567890 1234567890 1234567890 1234567890 " +
             "1234567890 1234567890 1234567890 1234567890 1234567890 EOF"
         },
-        "parent": 110
+        "parent": 118
       },
 
       // Menu 2: NAI tests
