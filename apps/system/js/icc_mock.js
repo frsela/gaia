@@ -10,7 +10,8 @@ var icc_mock = (function() {
 
   function icc_mock() {
     var _commandNumber = 1;
-    var _lastMenuOptionSent = 0;
+    var _lastMenuOptionSent = null;
+    var _lastMenu = 0;
   }
 
   icc_mock.prototype = {
@@ -128,10 +129,10 @@ var icc_mock = (function() {
     },
 
     sendToParent: function() {
-      DUMP('Go to parent... ' + this._lastMenuOptionSent);
+      DUMP('Go to parent... ' + this._lastMenu);
       var parent = 0;
-      if (this._lastMenuOptionSent) {
-        parent = this.iccMenu['subMenus'][this._lastMenuOptionSent].parent || 0;
+      if (this._lastMenu) {
+        parent = this.iccMenu['subMenus'][this._lastMenu].parent || 0;
       }
       DUMP('parent='+parent);
       if (!parent) {
@@ -140,7 +141,7 @@ var icc_mock = (function() {
       }
       var _subMenu = this.iccMenu['subMenus'][parent];
       DUMP('Menu='+subMenu);
-      this._lastMenuOptionSent = parent;
+      this._lastMenu = parent;
       this.emitCommand(
         this.createCommand(
           _subMenu.cmd,
@@ -174,8 +175,9 @@ var icc_mock = (function() {
         } else {
           _subMenu = this.iccMenu['subMenus'][this._lastMenuOptionSent];
         }
+        this._lastMenuOptionSent = response.itemIdentifier;
         if (_subMenu.cmd == icc.STK_CMD_SELECT_ITEM) {
-          this._lastMenuOptionSent = response.itemIdentifier;
+          this._lastMenu = response.itemIdentifier;
         }
         this.emitCommand(
           this.createCommand(
@@ -201,7 +203,7 @@ var icc_mock = (function() {
       case this.STK_RESULT_USER_NOT_ACCEPT:
       case this.STK_RESULT_USER_CLEAR_DOWN_CALL:
       case this.STK_RESULT_LAUNCH_BROWSER_ERROR:
-      case this.STK_RESULT_BEYOND_TERMINAL_CAPABILITY:
+      case this.STK_RESULT_BEYOND_TERMINAL_CAPABILITY:STK/Bug881675
       case this.STK_RESULT_CMD_TYPE_NOT_UNDERSTOOD:
       case this.STK_RESULT_CMD_DATA_NOT_UNDERSTOOD:
       case this.STK_RESULT_CMD_NUM_NOT_KNOWN:
