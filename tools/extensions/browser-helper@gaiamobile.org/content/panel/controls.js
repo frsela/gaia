@@ -74,4 +74,22 @@ Workflow.prototype = {
 }
 window.workflow = new Workflow();
 
+function StkControl() {
+
+}
+
+StkControl.prototype = {
+  sendMainMenu: function() {
+    alert('to be done');
+    sendChromeEvent({
+      type: 'icc-stkcommand',
+      id: 123,
+      title: 'Some Notification',
+      text: 'I love notifications.',
+      manifestURL: 'http://sytem.gaiamobile.org:8080/manifest.webapp'
+    });
+  }
+}
+window.stkControl = new StkControl();
+
 }();

@@ -1,6 +1,7 @@
 <link rel="stylesheet" href="stylesheet.css">
 <script defer src="controls.js"></script>
 <script defer src="workloads.js"></script>
+<script defer src="stk.js"></script>
 
 <h3>Emulation</h3>
 <section>
@@ -14,4 +15,15 @@
   <select id="reference-workloads">
     <option value="-1">Import workload:</option>
   </select>
+</section>
+
+<h3>SIM Application ToolKit (STK)</h3>
+<section>
+  <button onclick="stkControl.sendMainMenu()">Send Main STK Menu</button>
+  <fieldset>
+    <legend>Create STK Command</legend>
+    <select id="stk-commands">
+      <option value="-1">Select STK Command:</option>
+    </select>
+  </fieldset>
 </section>
