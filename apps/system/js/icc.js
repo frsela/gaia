@@ -11,6 +11,7 @@ var icc = {
 
   init: function icc_init() {
     this._icc = this.getICC();
+    DUMP('icc: ', this._icc);
     this.hideViews();
     this.protectForms();
     this.getIccInfo();
@@ -18,6 +19,7 @@ var icc = {
     this.clearMenuCache(function() {
       window.navigator.mozSetMessageHandler('icc-stkcommand',
         function callHandleSTKCommand(message) {
+          DUMP('+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++');
           self.handleSTKCommand(message);
         });
     });

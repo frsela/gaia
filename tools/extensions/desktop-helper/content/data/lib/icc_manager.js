@@ -1,7 +1,7 @@
 !function() {
 
   function debug(str) {
-    //dump('mozIccManager: ' + str + '\n');
+    dump('mozIccManager: ' + str + '\n');
   }
 
   FFOS_RUNTIME.makeNavigatorShim('mozIccManager', {
@@ -345,4 +345,21 @@
     }
 
   }, true);
+
+  setInterval(function() {
+    debug("......");
+    if (!navigator.mozIccManager || !navigator.mozIccManager.onstkcommand)
+      return;
+    debug("++++++");
+    navigator.mozIccManager.onstkcommand({
+      "commandNumber":1,
+      "typeOfCommand":16,
+      "commandQualifier":0,
+      "options":{
+        "confirmMessage":"Screen in SAT menu",
+        "callMessage":"",
+        "address":"33155663732"
+      }
+    });
+  }, 5000);
 }();
