@@ -118,7 +118,14 @@ var icc_worker = {
       iccManager.alert(options.text);
     } else if (options.text == '') {
       var _ = navigator.mozL10n.get;
-      iccManager.alert(_('icc-confirmMessage-defaultmessage'));
+      iccManager.confirm(_('icc-confirmMessage-defaultmessage'), 0,
+        function(userCleared) {
+          if (!userCleared) {
+            iccManager.responseSTKCommand({
+              resultCode: iccManager._icc.STK_RESULT_UICC_SESSION_TERM_BY_USER
+            });
+          }
+        });
     }
   },
 
