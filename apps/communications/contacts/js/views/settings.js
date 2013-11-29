@@ -22,6 +22,7 @@ contacts.Settings = (function() {
     importGmailOption,
     importSDOption,
     exportSDOption,
+    importDAVMailOption,
     fbImportOption,
     fbImportCheck,
     fbUpdateButton,
@@ -102,6 +103,7 @@ contacts.Settings = (function() {
     importSettingsTitle = document.getElementById('import-settings-title');
     importLiveOption = document.getElementById('import-gmail-option');
     importGmailOption = document.getElementById('import-live-option');
+    importDAVMailOption = document.getElementById('import-davmail-option');
 
     /*
      * Adding listeners
@@ -218,6 +220,9 @@ contacts.Settings = (function() {
         break;
       case 'sd':
         window.setTimeout(requireOverlay.bind(this, onSdImport), 0);
+        break;
+      case 'davmail':
+        window.setTimeout(requireOverlay.bind(this, onDAVMailImport), 0);
         break;
       case 'gmail':
         Contacts.extServices.importGmail();
@@ -795,6 +800,88 @@ contacts.Settings = (function() {
     }
   };
 
+  var onDAVMailImport = function onDAVMailImport() {
+    var user = prompt('What is your TID username?');
+    var xhr = new XMLHttpRequest({mozSystem: true});
+
+    xhr.onload = function DAVMailListener() {
+      var importedContacts = 0;
+      var DELAY_FEEDBACK = 200;
+      var wakeLock = navigator.requestWakeLock('cpu');
+      var progress = Contacts.showOverlay(
+        _('davmailContacts-reading'), 'activityBar');
+      var importer = new VCFReader(xhr.response);
+      if (!xhr.response || !importer)
+        return import_error('No contacts were found.', cb);
+
+      importer.onread = import_read;
+      importer.onimported = imported_contact;
+      importer.onerror = import_error;
+
+      importer.process(function import_finish() {
+        window.setTimeout(function onfinish_import() {
+          window.importUtils.setTimestamp('sd', function() {
+            // Once the timestamp is saved, update the list
+            updateTimestamps();
+            checkExport();
+            resetWait(wakeLock);
+            if (!cancelled) {
+              Contacts.showStatus(_('davmailContacts-imported3', {
+                n: importedContacts
+              }));
+              if (typeof cb === 'function') {
+                cb();
+              }
+            }
+          });
+        }, DELAY_FEEDBACK);
+      });
+
+      function import_read(n) {
+        progress.setClass('progressBar');
+        progress.setHeaderMsg(_('davmailContacts-importing'));
+        progress.setTotal(n);
+      }
+
+      function imported_contact() {
+        importedContacts++;
+        progress.update();
+      }
+
+      function import_error(e, cb) {
+        var cancel = {
+          title: _('cancel'),
+          callback: function() {
+            ConfirmDialog.hide();
+          }
+        };
+
+        var retry = {
+          title: _('retry'),
+          isRecommend: true,
+          callback: function() {
+            ConfirmDialog.hide();
+            // And now the action is reproduced one more time
+            window.setTimeout(requireOverlay.bind(this, onSdImport), 0);
+          }
+        };
+        Contacts.confirmDialog(null, _('davmailContacts-error'), cancel,
+          retry);
+        resetWait(wakeLock);
+        if (typeof cb === 'function') {
+          cb();
+        }
+      }
+
+    };
+
+    xhr.open('GET',
+      'http://caldav.srv.openwebdevice.com:6891/users/' +
+        user + '@tid.es/contacts/');
+    xhr.responseType = 'text';
+    xhr.send();
+  };
+
   // Dismiss settings window and execute operations if values got modified
   var close = function close() {
     if (newOrderByLastName != null &&
@@ -829,6 +916,7 @@ contacts.Settings = (function() {
     // Other import services settings
     updateOptionStatus(importGmailOption, !navigator.onLine, true);
     updateOptionStatus(importLiveOption, !navigator.onLine, true);
+    updateOptionStatus(importDAVMailOption, !navigator.onLine, true);
   };
 
   var checkExport = function checkExport() {
