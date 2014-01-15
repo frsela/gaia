@@ -4,45 +4,45 @@
 'use strict';
 
 var icc_worker = {
-  dummy: function icc_worker_dummy(iccManager) {
+  dummy: function icc_worker_dummy(message, iccManager) {
     DUMP('STK Command not implemented yet');
-    iccManager.responseSTKCommand({
+    iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
   },
 
   // STK_CMD_REFRESH
-  '0x1': function STK_CMD_REFRESH(command, iccManager) {
+  '0x1': function STK_CMD_REFRESH(message, iccManager) {
     // https://bugzilla.mozilla.org/show_bug.cgi?id=800271#c10
-    DUMP('STK_CMD_REFRESH', command.options);
-    icc_worker.dummy(iccManager);
+    DUMP('STK_CMD_REFRESH', message.command.options);
+    icc_worker.dummy(message, iccManager);
   },
 
   // STK_CMD_POLL_INTERVAL
-  '0x3': function STK_CMD_POLL_INTERVAL(command, iccManager) {
-    DUMP('STK_CMD_POLL_INTERVAL', command.options);
-    icc_worker.dummy(iccManager);
+  '0x3': function STK_CMD_POLL_INTERVAL(message, iccManager) {
+    DUMP('STK_CMD_POLL_INTERVAL', message.command.options);
+    icc_worker.dummy(message, iccManager);
   },
 
   // STK_CMD_POLL_OFF
-  '0x4': function STK_CMD_POLL_OFF(command, iccManager) {
-    DUMP('STK_CMD_POLL_OFF', command.options);
-    icc_worker.dummy(iccManager);
+  '0x4': function STK_CMD_POLL_OFF(message, iccManager) {
+    DUMP('STK_CMD_POLL_OFF', message.command.options);
+    icc_worker.dummy(message, iccManager);
   },
 
   // STK_CMD_SET_UP_EVENT_LIST
-  '0x5': function STK_CMD_SET_UP_EVENT_LIST(command, iccManager) {
-    DUMP('STK_CMD_SET_UP_EVENT_LIST:', command.options);
-    icc_events.register(command.options.eventList);
-    iccManager.responseSTKCommand({
+  '0x5': function STK_CMD_SET_UP_EVENT_LIST(message, iccManager) {
+    DUMP('STK_CMD_SET_UP_EVENT_LIST:', message.command.options);
+    icc_events.register(message.command.options.eventList);
+    iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
   },
 
   // STK_CMD_SET_UP_CALL
-  '0x10': function STK_CMD_SET_UP_CALL(command, iccManager) {
+  '0x10': function STK_CMD_SET_UP_CALL(message, iccManager) {
     function stkSetupCall(confirmed, postMessage) {
-      iccManager.responseSTKCommand({
+      iccManager.responseSTKCommand(message, {
         hasConfirmed: confirmed,
         resultCode: iccManager._iccManager.STK_RESULT_OK
       });
@@ -55,8 +55,8 @@ var icc_worker = {
     }
 
     var _ = navigator.mozL10n.get;
-    DUMP('STK_CMD_SET_UP_CALL:', command.options);
-    var options = command.options;
+    DUMP('STK_CMD_SET_UP_CALL:', message.command.options);
+    var options = message.command.options;
     if (!options.confirmMessage) {
       options.confirmMessage = _(
         'icc-confirmCall-defaultmessage', {
@@ -73,10 +73,10 @@ var icc_worker = {
   },
 
   // STK_CMD_SEND_SS
-  '0x11': function STK_CMD_SEND_SS(command, iccManager) {
-    DUMP('STK_CMD_SEND_SS:', command.options);
-    var options = command.options;
-    iccManager.responseSTKCommand({
+  '0x11': function STK_CMD_SEND_SS(message, iccManager) {
+    DUMP('STK_CMD_SEND_SS:', message.command.options);
+    var options = message.command.options;
+    iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
     if (!options.text) {
@@ -87,16 +87,16 @@ var icc_worker = {
   },
 
   // STK_CMD_SEND_USSD
-  '0x12': function STK_CMD_SEND_USSD(command, iccManager) {
-    DUMP('STK_CMD_SEND_USSD:', command.options);
-    this['0x13'](command, iccManager);
+  '0x12': function STK_CMD_SEND_USSD(message, iccManager) {
+    DUMP('STK_CMD_SEND_USSD:', message.command.options);
+    this['0x13'](message, iccManager);
   },
 
   // STK_CMD_SEND_SMS
-  '0x13': function STK_CMD_SEND_SMS(command, iccManager) {
-    DUMP('STK_CMD_SEND_SMS:', command.options);
-    var options = command.options;
-    iccManager.responseSTKCommand({
+  '0x13': function STK_CMD_SEND_SMS(message, iccManager) {
+    DUMP('STK_CMD_SEND_SMS:', message.command.options);
+    var options = message.command.options;
+    iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
     if (options.text) {
@@ -108,10 +108,10 @@ var icc_worker = {
   },
 
   // STK_CMD_SEND_DTMF
-  '0x14': function STK_CMD_SEND_DTMF(command, iccManager) {
-    DUMP('STK_CMD_SEND_DTMF:', command.options);
-    var options = command.options;
-    iccManager.responseSTKCommand({
+  '0x14': function STK_CMD_SEND_DTMF(message, iccManager) {
+    DUMP('STK_CMD_SEND_DTMF:', message.command.options);
+    var options = message.command.options;
+    iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
     if (options.text) {
@@ -123,17 +123,17 @@ var icc_worker = {
   },
 
   // STK_CMD_LAUNCH_BROWSER
-  '0x15': function STK_CMD_LAUNCH_BROWSER(command, iccManager) {
-    DUMP('STK_CMD_LAUNCH_BROWSER:', command.options);
-    var options = command.options;
-    iccManager.responseSTKCommand({
+  '0x15': function STK_CMD_LAUNCH_BROWSER(message, iccManager) {
+    DUMP('STK_CMD_LAUNCH_BROWSER:', message.command.options);
+    var options = message.command.options;
+    iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
     iccManager.showURL(options.url, options.confirmMessage);
   },
 
   // STK_CMD_PLAY_TONE
-  '0x20': function STK_CMD_PLAY_TONE(command, iccManager) {
+  '0x20': function STK_CMD_PLAY_TONE(message, iccManager) {
     function getPhoneSound(toneCode) {
       toneCode =
         typeof(toneCode) == 'string' ? toneCode.charCodeAt(0) : toneCode;
@@ -163,8 +163,8 @@ var icc_worker = {
       }
     }
 
-    DUMP('STK_CMD_PLAY_TONE:', command.options);
-    var options = command.options;
+    DUMP('STK_CMD_PLAY_TONE:', message.command.options);
+    var options = message.command.options;
 
     var tonePlayer = new Audio();
     tonePlayer.src = getPhoneSound(options.tone);
@@ -191,13 +191,13 @@ var icc_worker = {
         if (userCleared == null) {  // Back && Terminate
           return;
         }
-        iccManager.responseSTKCommand({
+        iccManager.responseSTKCommand(message, {
           resultCode: iccManager._iccManager.STK_RESULT_OK
         });
       });
     } else {
       // If no dialog is showed, we answer the STK command
-      iccManager.responseSTKCommand({
+      iccManager.responseSTKCommand(message, {
         resultCode: iccManager._iccManager.STK_RESULT_OK
       });
       // Stop playing after timeout
@@ -214,11 +214,11 @@ var icc_worker = {
   },
 
   // STK_CMD_DISPLAY_TEXT
-  '0x21': function STK_CMD_DISPLAY_TEXT(command, iccManager) {
-    DUMP('STK_CMD_DISPLAY_TEXT:', command.options);
-    var options = command.options;
+  '0x21': function STK_CMD_DISPLAY_TEXT(message, iccManager) {
+    DUMP('STK_CMD_DISPLAY_TEXT:', message.command.options);
+    var options = message.command.options;
     if (options.responseNeeded) {
-      iccManager.responseSTKCommand({
+      iccManager.responseSTKCommand(message, {
         resultCode: iccManager._iccManager.STK_RESULT_OK
       });
       iccManager.confirm(options.text, iccManager._displayTextTimeout, null);
@@ -228,16 +228,16 @@ var icc_worker = {
           if (userCleared == null) {
             return;   // ICC Back or ICC Terminate
           }
-          DUMP('STK_CMD_DISPLAY_TEXT callback for ', command);
+          DUMP('STK_CMD_DISPLAY_TEXT callback for ', message.command);
           if (options.userClear && !userCleared) {
             DUMP('No response from user (Timeout)');
-            iccManager.responseSTKCommand({
+            iccManager.responseSTKCommand(message, {
               resultCode:
                 iccManager._iccManager.STK_RESULT_NO_RESPONSE_FROM_USER
             });
           } else {
             DUMP('Alert closed');
-            iccManager.responseSTKCommand({
+            iccManager.responseSTKCommand(message, {
               resultCode: iccManager._iccManager.STK_RESULT_OK
             });
           }
@@ -246,15 +246,15 @@ var icc_worker = {
   },
 
   // STK_CMD_GET_INKEY
-  '0x22': function STK_CMD_GET_INKEY(command, iccManager) {
-    DUMP('STK_CMD_GET_INKEY:', command.options);
-    this['0x23'](command, iccManager);
+  '0x22': function STK_CMD_GET_INKEY(message, iccManager) {
+    DUMP('STK_CMD_GET_INKEY:', message.command.options);
+    this['0x23'](message, iccManager);
   },
 
   // STK_CMD_GET_INPUT
-  '0x23': function STK_CMD_GET_INPUT(command, iccManager) {
-    DUMP('STK_CMD_GET_INPUT:', command.options);
-    var options = command.options;
+  '0x23': function STK_CMD_GET_INPUT(message, iccManager) {
+    DUMP('STK_CMD_GET_INPUT:', message.command.options);
+    var options = message.command.options;
 
     DUMP('STK Input title: ' + options.text);
 
@@ -262,7 +262,7 @@ var icc_worker = {
       function stkInputNoAttended() {
         document.removeEventListener('visibilitychange', stkInputNoAttended,
           true);
-        iccManager.responseSTKCommand({
+        iccManager.responseSTKCommand(message, {
           resultCode:
             iccManager._iccManager.STK_RESULT_UICC_SESSION_TERM_BY_USER
         });
@@ -279,12 +279,13 @@ var icc_worker = {
         }
         if (!response) {
           DUMP('STK_CMD_GET_INPUT: No response from user (Timeout)');
-          iccManager.responseSTKCommand({
-            resultCode: iccManager._iccManager.STK_RESULT_NO_RESPONSE_FROM_USER
+          iccManager.responseSTKCommand(message, {
+            resultCode:
+              iccManager._iccManager.STK_RESULT_NO_RESPONSE_FROM_USER
           });
         } else {
           DUMP('STK_CMD_GET_INPUT: Response = ', value);
-          iccManager.responseSTKCommand({
+          iccManager.responseSTKCommand(message, {
             resultCode: iccManager._iccManager.STK_RESULT_OK,
             input: value
           });
@@ -293,12 +294,13 @@ var icc_worker = {
   },
 
   // STK_CMD_SELECT_ITEM
-  '0x24': function STK_CMD_SELECT_ITEM(command, iccManager) {
+  '0x24': function STK_CMD_SELECT_ITEM(message, iccManager) {
     var application = document.location.protocol + '//' +
       document.location.host.replace('system', 'settings');
-    DUMP('STK_CMD_SET_UP_MENU. Transferring to ' + application + ': ', command);
+    DUMP('STK_CMD_SET_UP_MENU. Transferring to ' + application + ': ',
+      message.command);
     var reqIccData = window.navigator.mozSettings.createLock().set({
-      'icc.data': JSON.stringify(command)
+      'icc.data': JSON.stringify(message.command)
     });
     reqIccData.onsuccess = function icc_getIccData() {
       if (AppWindowManager.getRunningApps()[application]) {
@@ -317,21 +319,21 @@ var icc_worker = {
   },
 
   // STK_CMD_SET_UP_MENU
-  '0x25': function STK_CMD_SET_UP_MENU(command, iccManager) {
-    DUMP('STK_CMD_SET_UP_MENU:', command.options);
+  '0x25': function STK_CMD_SET_UP_MENU(message, iccManager) {
+    DUMP('STK_CMD_SET_UP_MENU:', message.command.options);
     var reqApplications = window.navigator.mozSettings.createLock().set({
-      'icc.applications': JSON.stringify(command.options)
+      'icc.applications': JSON.stringify(message.command.options)
     });
     reqApplications.onsuccess = function icc_getApplications() {
       DUMP('Cached');
-      iccManager.responseSTKCommand({
+      iccManager.responseSTKCommand(message, {
         resultCode: iccManager._iccManager.STK_RESULT_OK
       });
     };
   },
 
   // STK_CMD_PROVIDE_LOCAL_INFO
-  '0x26': function STK_CMD_PROVIDE_LOCAL_INFO(command, iccManager) {
+  '0x26': function STK_CMD_PROVIDE_LOCAL_INFO(message, iccManager) {
 
     // XXX: check bug-926169
     // this is used to keep all tests passing while introducing multi-sim APIs
@@ -339,10 +341,10 @@ var icc_worker = {
       window.navigator.mozMobileConnections &&
         window.navigator.mozMobileConnections[0];
 
-    DUMP('STK_CMD_PROVIDE_LOCAL_INFO:', command.options);
-    switch (command.options.localInfoType) {
+    DUMP('STK_CMD_PROVIDE_LOCAL_INFO:', message.command.options);
+    switch (message.command.options.localInfoType) {
       case iccManager._iccManager.STK_LOCAL_INFO_LOCATION_INFO:
-        iccManager.responseSTKCommand({
+        iccManager.responseSTKCommand(message, {
           localInfo: {
             locationInfo: {
               mcc: IccHelper.iccInfo.mcc,
@@ -359,7 +361,7 @@ var icc_worker = {
         var req = conn.sendMMI('*#06#');
         req.onsuccess = function getIMEI() {
           if (req.result && req.result.statusMessage) {
-            iccManager.responseSTKCommand({
+            iccManager.responseSTKCommand(message, {
               localInfo: {
                 imei: req.result.statusMessage
               },
@@ -368,7 +370,7 @@ var icc_worker = {
           }
         };
         req.onerror = function errorIMEI() {
-          iccManager.responseSTKCommand({
+          iccManager.responseSTKCommand(message, {
               localInfo: {
                 imei: '0'
               },
@@ -379,7 +381,7 @@ var icc_worker = {
         break;
 
       case iccManager._iccManager.STK_LOCAL_INFO_DATE_TIME_ZONE:
-        iccManager.responseSTKCommand({
+        iccManager.responseSTKCommand(message, {
           localInfo: {
             date: new Date()
           },
@@ -391,7 +393,7 @@ var icc_worker = {
         var reqLanguage =
           window.navigator.mozSettings.createLock().get('language.current');
         reqLanguage.onsuccess = function icc_getLanguage() {
-          iccManager.responseSTKCommand({
+          iccManager.responseSTKCommand(message, {
             localInfo: {
               language: reqLanguage.result['language.current'].substring(0, 2)
             },
@@ -399,7 +401,7 @@ var icc_worker = {
           });
         };
         reqLanguage.onerror = function icc_getLanguageFailed() {
-          iccManager.responseSTKCommand({
+          iccManager.responseSTKCommand(message, {
             localInfo: {
               language: 'en'
             },
@@ -412,21 +414,21 @@ var icc_worker = {
   },
 
   // STK_CMD_TIMER_MANAGEMENT
-  '0x27': function STK_CMD_TIMER_MANAGEMENT(command, iccManager) {
-    DUMP('STK_CMD_TIMER_MANAGEMENT:', command.options);
+  '0x27': function STK_CMD_TIMER_MANAGEMENT(message, iccManager) {
+    DUMP('STK_CMD_TIMER_MANAGEMENT:', message.command.options);
     var a_timer = advanced_timer;
-    var options = command.options;
+    var options = message.command.options;
     var pendingTime = 0;
     switch (options.timerAction) {
       case iccManager._iccManager.STK_TIMER_START:
         a_timer.start(options.timerId, options.timerValue * 1000,
           function() {
             DUMP('Timer expiration - ' + options.timerId);
-            iccManager._icc.sendStkTimerExpiration({
+            (icc.getIcc(message.iccId)).sendStkTimerExpiration({
               'timerId': options.timerId
             });
           });
-        iccManager.responseSTKCommand({
+        iccManager.responseSTKCommand(message, {
           timer: {
             'timerId': options.timerId,
             'timerValue': options.timerValue,
@@ -438,7 +440,7 @@ var icc_worker = {
 
       case iccManager._iccManager.STK_TIMER_DEACTIVATE:
         pendingTime = a_timer.stop(options.timerId) / 1000;
-        iccManager.responseSTKCommand({
+        iccManager.responseSTKCommand(message, {
           timer: {
             'timerId': options.timerId,
             'timerValue': pendingTime,
@@ -450,7 +452,7 @@ var icc_worker = {
 
       case iccManager._iccManager.STK_TIMER_GET_CURRENT_VALUE:
         pendingTime = a_timer.queryPendingTime(options.timerId) / 1000;
-        iccManager.responseSTKCommand({
+        iccManager.responseSTKCommand(message, {
           timer: {
             'timerId': options.timerId,
             'timerValue': pendingTime,
@@ -463,13 +465,13 @@ var icc_worker = {
   },
 
   // STK_CMD_SET_UP_IDLE_MODE_TEXT
-  '0x28': function STK_CMD_SET_UP_IDLE_MODE_TEXT(command, iccManager) {
-    DUMP('STK_CMD_SET_UP_IDLE_MODE_TEXT:', command.options);
-    var options = command.options;
+  '0x28': function STK_CMD_SET_UP_IDLE_MODE_TEXT(message, iccManager) {
+    DUMP('STK_CMD_SET_UP_IDLE_MODE_TEXT:', message.command.options);
+    var options = message.command.options;
     NotificationHelper.send('STK', options.text, '', function() {
       iccManager.alert(options.text);
     });
-    iccManager.responseSTKCommand({
+    iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
   }
