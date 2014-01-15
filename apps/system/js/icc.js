@@ -4,7 +4,6 @@
 'use strict';
 
 var icc = {
-  _iccLastCommand: null,
   _displayTextTimeout: 40000,
   _defaultURL: null,
   _inputTimeout: 40000,
@@ -12,7 +11,6 @@ var icc = {
 
   init: function icc_init() {
     this._iccManager = window.navigator.mozIccManager;
-    this._icc = this.getICC();
     this.hideViews();
     this.protectForms();
     this.getIccInfo();
@@ -20,12 +18,9 @@ var icc = {
     this.clearMenuCache(function() {
       window.navigator.mozSetMessageHandler('icc-stkcommand',
         function callHandleSTKCommand(message) {
-          // TODO: Bug 942714 - [DSDS][Gaia] STK menu and event for DSDS
-          // Backward compatibility for both new/old format to make sure we
-          // won't break single sim behavior. The support for DSDS will be
-          // addressed in bug 942714.
-          var command = message.command || message;
-          self.handleSTKCommand(command);
+          if (self._iccManager && self._iccManager.getIccById) {
+            self.handleSTKCommand(message);
+          }
         });
     });
 
@@ -82,11 +77,9 @@ var icc = {
     xhr.send();
   },
 
-  getICC: function icc_getICC() {
-    // See bug 932134
-    // To keep all tests passed while introducing multi-sim APIs, in bug 928325
-    // we use IccHelper. Stop using IccHelper after the APIs land.
-    return IccHelper;
+  getIcc: function icc_getIcc(iccId) {
+    DUMP('Getting ICC for ' + iccId);
+    return this._iccManager.getIccById(iccId);
   },
 
   clearMenuCache: function icc_clearMenuCache(callback) {
@@ -103,38 +96,35 @@ var icc = {
     };
   },
 
-  handleSTKCommand: function icc_handleSTKCommand(command) {
-    DUMP('STK Proactive Command:', command);
+  handleSTKCommand: function icc_handleSTKCommand(message) {
+    DUMP('STK Proactive Command for SIM ' + message.iccId + ': ',
+      message.command);
     if (FtuLauncher.isFtuRunning()) {
       // Delay the stk command until FTU is done
       var self = this;
       window.addEventListener('ftudone', function ftudone() {
-        DUMP('FTU is done!... processing STK command:', command);
-        self.handleSTKCommand(command);
+        DUMP('FTU is done!... processing STK message:', message);
+        self.handleSTKCommand(message);
       });
       return DUMP('FTU is running, delaying STK...');
     }
 
-    this._iccLastCommand = command;
-
-    var cmdId = '0x' + command.typeOfCommand.toString(16);
+    var cmdId = '0x' + message.command.typeOfCommand.toString(16);
     if (icc_worker[cmdId]) {
-      return icc_worker[cmdId](command, this);
+      return icc_worker[cmdId](message, this);
     }
 
-    DUMP('STK Command not recognized ! - ', command);
+    DUMP('STK Command not recognized ! - ', message);
   },
 
 
   /**
    * Response ICC Command
    */
-  responseSTKCommand: function icc_responseSTKCommand(response) {
-    DUMP('sendStkResponse to command: ', this._iccLastCommand);
+  responseSTKCommand: function icc_responseSTKCommand(message, response) {
     DUMP('sendStkResponse -- # response = ', response);
 
-    this._icc.sendStkResponse(this._iccLastCommand, response);
-    this._iccLastCommand = null;
+    (icc.getIcc(message.iccId)).sendStkResponse(message.command, response);
   },
 
   /**
