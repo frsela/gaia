@@ -122,7 +122,7 @@ var icc = {
    * Response ICC Command
    */
   responseSTKCommand: function icc_responseSTKCommand(message, response) {
-    DUMP('sendStkResponse -- # response = ', response);
+    DUMP('STK sendStkResponse -- # response = ', response);
 
     (icc.getIcc(message.iccId)).sendStkResponse(message.command, response);
   },
@@ -130,14 +130,18 @@ var icc = {
   /**
    * Common responses
    */
-  terminateResponse: function() {
-    this.responseSTKCommand({
+  terminateResponse: function(message) {
+    DUMP('STK Sending STK_RESULT_UICC_SESSION_TERM_BY_USER to card ' +
+      message.iccId);
+    this.responseSTKCommand(message, {
       resultCode: this._iccManager.STK_RESULT_UICC_SESSION_TERM_BY_USER
     });
   },
 
-  backResponse: function() {
-    this.responseSTKCommand({
+  backResponse: function(message) {
+    DUMP('STK Sending STK_RESULT_BACKWARD_MOVE_BY_USER to card ' +
+      message.iccId);
+    this.responseSTKCommand(message, {
       resultCode: this._iccManager.STK_RESULT_BACKWARD_MOVE_BY_USER
     });
   },
@@ -204,7 +208,7 @@ var icc = {
     }
   },
 
-  alert: function icc_alert(message) {
+  alert: function icc_alert(stkMessage, message) {
     if (!this.icc_alert) {
       this.icc_alert = document.getElementById('icc-alert');
       this.icc_alert_msg = document.getElementById('icc-alert-msg');
@@ -224,7 +228,7 @@ var icc = {
   /**
    * callback responds with "userCleared"
    */
-  confirm: function(message, timeout, callback) {
+  confirm: function(stkMessage, message, timeout, callback) {
     if (!this.icc_confirm) {
       this.icc_confirm = document.getElementById('icc-confirm');
       this.icc_confirm_msg = document.getElementById('icc-confirm-msg');
@@ -244,13 +248,13 @@ var icc = {
     this.icc_confirm_btn_back.onclick = function() {
       clearTimeout(timeoutId);
       self.hideViews();
-      self.backResponse();
+      self.backResponse(stkMessage);
       callback(null);
     };
     this.icc_confirm_btn_close.onclick = function() {
       clearTimeout(timeoutId);
       self.hideViews();
-      self.terminateResponse();
+      self.terminateResponse(stkMessage);
       callback(null);
     };
 
@@ -273,7 +277,7 @@ var icc = {
     this.icc_view.classList.add('visible');
   },
 
-  asyncConfirm: function(message, callback) {
+  asyncConfirm: function(stkMessage, message, callback) {
     if (typeof callback != 'function') {
       callback = function() {};
     }
@@ -306,7 +310,7 @@ var icc = {
   /**
    * Open URL
    */
-  showURL: function(url, confirmMessage) {
+  showURL: function(stkMessage, url, confirmMessage) {
     function openURL(url) {
       // Sanitise url just in case it doesn't start with http or https
       // the web activity won't work, so add by default the http protocol
@@ -325,7 +329,7 @@ var icc = {
     DUMP('Final URL to open: ' + url);
     if (url != null || url.length != 0) {
       if (confirmMessage) {
-        this.asyncConfirm(confirmMessage, function(res) {
+        this.asyncConfirm(stkMessage, confirmMessage, function(res) {
           if (res) {
             openURL(url);
           }
@@ -336,7 +340,7 @@ var icc = {
     }
   },
 
-  input: function(message, timeout, options, callback) {
+  input: function(stkMessage, message, timeout, options, callback) {
     var self = this;
     var timeoutId = null;
     /**
@@ -448,7 +452,7 @@ var icc = {
     this.icc_input_btn_back.onclick = function() {
       clearInputTimeout();
       self.hideViews();
-      self.backResponse();
+      self.backResponse(stkMessage);
       callback(null);
     };
     this.icc_input_btn_help.onclick = function() {

@@ -64,9 +64,10 @@ var icc_worker = {
         });
     }
     if (options.confirmMessage) {
-      iccManager.asyncConfirm(options.confirmMessage, function(confirmed) {
-        stkSetupCall(confirmed, options.callMessage);
-      });
+      iccManager.asyncConfirm(message, options.confirmMessage,
+        function(confirmed) {
+          stkSetupCall(confirmed, options.callMessage);
+        });
     } else {
       stkSetupCall(true, options.callMessage);
     }
@@ -83,7 +84,7 @@ var icc_worker = {
       var _ = navigator.mozL10n.get;
       options.text = _('icc-alertMessage-defaultmessage');
     }
-    iccManager.alert(options.text);
+    iccManager.alert(message, options.text);
   },
 
   // STK_CMD_SEND_USSD
@@ -100,10 +101,10 @@ var icc_worker = {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
     if (options.text) {
-      iccManager.confirm(options.text);
+      iccManager.confirm(message, options.text);
     } else if (options.text != undefined) {
       var _ = navigator.mozL10n.get;
-      iccManager.alert(_('icc-alertMessage-defaultmessage'));
+      iccManager.alert(message, _('icc-alertMessage-defaultmessage'));
     }
   },
 
@@ -115,10 +116,10 @@ var icc_worker = {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
     if (options.text) {
-      iccManager.alert(options.text);
+      iccManager.alert(message, options.text);
     } else if (options.text == '') {
       var _ = navigator.mozL10n.get;
-      iccManager.alert(_('icc-confirmMessage-defaultmessage'));
+      iccManager.alert(message, _('icc-confirmMessage-defaultmessage'));
     }
   },
 
@@ -129,7 +130,7 @@ var icc_worker = {
     iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
-    iccManager.showURL(options.url, options.confirmMessage);
+    iccManager.showURL(message, options.url, options.confirmMessage);
   },
 
   // STK_CMD_PLAY_TONE
@@ -186,7 +187,7 @@ var icc_worker = {
     timeout && DUMP('Tone stop in (ms): ', timeout);
 
     if (options.text) {
-      iccManager.confirm(options.text, timeout, function(userCleared) {
+      iccManager.confirm(message, options.text, timeout, function(userCleared) {
         tonePlayer.pause();
         if (userCleared == null) {  // Back && Terminate
           return;
@@ -221,9 +222,10 @@ var icc_worker = {
       iccManager.responseSTKCommand(message, {
         resultCode: iccManager._iccManager.STK_RESULT_OK
       });
-      iccManager.confirm(options.text, iccManager._displayTextTimeout, null);
+      iccManager.confirm(message, options.text, iccManager._displayTextTimeout,
+        null);
     } else {
-      iccManager.confirm(options.text, iccManager._displayTextTimeout,
+      iccManager.confirm(message, options.text, iccManager._displayTextTimeout,
         function(userCleared) {
           if (userCleared == null) {
             return;   // ICC Back or ICC Terminate
@@ -469,7 +471,7 @@ var icc_worker = {
     DUMP('STK_CMD_SET_UP_IDLE_MODE_TEXT:', message.command.options);
     var options = message.command.options;
     NotificationHelper.send('STK', options.text, '', function() {
-      iccManager.alert(options.text);
+      iccManager.alert(message, options.text);
     });
     iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
