@@ -78,8 +78,20 @@ var icc = {
   },
 
   getIcc: function icc_getIcc(iccId) {
-    DUMP('Getting ICC for ' + iccId);
+    DUMP('ICC Getting ICC for ' + iccId);
     return this._iccManager.getIccById(iccId);
+  },
+
+  getConnection: function icc_getConnection(iccId) {
+    DUMP('ICC Getting Connection for ' + iccId);
+    for (var i = 0; i < window.navigator.mozMobileConnections.length; i++) {
+      DUMP('ICC 1 ' + window.navigator.mozMobileConnections[i].iccId);
+      if (window.navigator.mozMobileConnections[i].iccId === iccId) {
+        DUMP('ICC Connection ' + i + ' found for ' + iccId);
+        return window.navigator.mozMobileConnections[i];
+      }
+    }
+    return null;
   },
 
   clearMenuCache: function icc_clearMenuCache(callback) {
