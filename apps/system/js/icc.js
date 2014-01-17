@@ -85,13 +85,22 @@ var icc = {
   getConnection: function icc_getConnection(iccId) {
     DUMP('ICC Getting Connection for ' + iccId);
     for (var i = 0; i < window.navigator.mozMobileConnections.length; i++) {
-      DUMP('ICC 1 ' + window.navigator.mozMobileConnections[i].iccId);
       if (window.navigator.mozMobileConnections[i].iccId === iccId) {
         DUMP('ICC Connection ' + i + ' found for ' + iccId);
         return window.navigator.mozMobileConnections[i];
       }
     }
     return null;
+  },
+
+  getSIMNumber: function icc_getSIMNumber(iccId) {
+    DUMP('ICC Getting SIM Number for ' + iccId);
+    for (var i = 0; i < window.navigator.mozMobileConnections.length; i++) {
+      if (window.navigator.mozMobileConnections[i].iccId === iccId) {
+        return i + 1;
+      }
+    }
+    return '';
   },
 
   clearMenuCache: function icc_clearMenuCache(callback) {
@@ -221,14 +230,17 @@ var icc = {
   },
 
   alert: function icc_alert(stkMessage, message) {
+    var _ = navigator.mozL10n.get;
     if (!this.icc_alert) {
       this.icc_alert = document.getElementById('icc-alert');
-      this.icc_alert_iccId = document.getElementById('icc-alert-iccId');
+      this.icc_alert_title = document.getElementById('icc-alert-title');
       this.icc_alert_msg = document.getElementById('icc-alert-msg');
       this.icc_alert_btn = document.getElementById('icc-alert-btn');
     }
 
-    this.icc_alert_iccId.textContent = stkMessage.iccId;
+    this.icc_alert_title.textContent = _('icc-message', {
+        'id': this.getSIMNumber(stkMessage.iccId)
+      });
 
     var self = this;
     this.icc_alert_btn.onclick = function closeICCalert() {
@@ -244,9 +256,10 @@ var icc = {
    * callback responds with "userCleared"
    */
   confirm: function(stkMessage, message, timeout, callback) {
+    var _ = navigator.mozL10n.get;
     if (!this.icc_confirm) {
       this.icc_confirm = document.getElementById('icc-confirm');
-      this.icc_confirm_iccId = document.getElementById('icc-confirm-iccId');
+      this.icc_confirm_title = document.getElementById('icc-confirm-title');
       this.icc_confirm_msg = document.getElementById('icc-confirm-msg');
       this.icc_confirm_btn = document.getElementById('icc-confirm-btn');
       this.icc_confirm_btn_back =
@@ -259,7 +272,9 @@ var icc = {
       callback = function() {};
     }
 
-    this.icc_confirm_iccId.textContent = stkMessage.iccId;
+    this.icc_confirm_title.textContent = _('icc-message', {
+        'id': this.getSIMNumber(stkMessage.iccId)
+      });
 
     var self = this;
 
@@ -297,14 +312,15 @@ var icc = {
   },
 
   asyncConfirm: function(stkMessage, message, callback) {
+    var _ = navigator.mozL10n.get;
     if (typeof callback != 'function') {
       callback = function() {};
     }
     if (!this.icc_asyncconfirm) {
       this.icc_asyncconfirm =
         document.getElementById('icc-asyncconfirm');
-      this.icc_asyncconfirm_iccId =
-        document.getElementById('icc-asyncconfirm-iccId');
+      this.icc_asyncconfirm_title =
+        document.getElementById('icc-asyncconfirm-title');
       this.icc_asyncconfirm_msg =
         document.getElementById('icc-asyncconfirm-msg');
       this.icc_asyncconfirm_btn_no =
@@ -313,7 +329,9 @@ var icc = {
         document.getElementById('icc-asyncconfirm-btn-yes');
     }
 
-    this.icc_asyncconfirm_iccId.textContent = stkMessage.iccId;
+    this.icc_asyncconfirm_title.textContent = _('icc-message', {
+        'id': this.getSIMNumber(stkMessage.iccId)
+      });
 
     var self = this;
     this.icc_asyncconfirm_btn_no.onclick = function rejectConfirm() {
@@ -364,6 +382,7 @@ var icc = {
   },
 
   input: function(stkMessage, message, timeout, options, callback) {
+    var _ = navigator.mozL10n.get;
     var self = this;
     var timeoutId = null;
     /**
@@ -396,7 +415,7 @@ var icc = {
 
     if (!this.icc_input) {
       this.icc_input = document.getElementById('icc-input');
-      this.icc_input_iccId = document.getElementById('icc-input-iccId');
+      this.icc_input_title = document.getElementById('icc-input-title');
       this.icc_input_msg = document.getElementById('icc-input-msg');
       this.icc_input_box = document.getElementById('icc-input-box');
       this.icc_input_btn = document.getElementById('icc-input-btn');
@@ -411,7 +430,9 @@ var icc = {
     }
     setInputTimeout();
 
-    this.icc_input_iccId.textContent = stkMessage.iccId;
+    this.icc_input_title.textContent = _('icc-inputtitle', {
+        'id': this.getSIMNumber(stkMessage.iccId)
+      });
 
     // Help
     this.icc_input_btn_help.disabled = !options.isHelpAvailable;
