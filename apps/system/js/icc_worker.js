@@ -274,7 +274,7 @@ var icc_worker = {
     var timeout = options.duration ||
       icc.calculateDurationInMS(options.duration) ||
       icc._inputTimeout;
-    icc.input(options.text, timeout, options,
+    icc.input(message, options.text, timeout, options,
       function(response, value) {
         if (response == null) {
           return;   // ICC Back or ICC Help
