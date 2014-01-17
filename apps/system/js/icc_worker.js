@@ -33,7 +33,7 @@ var icc_worker = {
   // STK_CMD_SET_UP_EVENT_LIST
   '0x5': function STK_CMD_SET_UP_EVENT_LIST(message, iccManager) {
     DUMP('STK_CMD_SET_UP_EVENT_LIST:', message.command.options);
-    icc_events.register(message.command.options.eventList);
+    icc_events.register(message, message.command.options.eventList);
     iccManager.responseSTKCommand(message, {
       resultCode: iccManager._iccManager.STK_RESULT_OK
     });
