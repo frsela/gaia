@@ -470,9 +470,10 @@ var icc_worker = {
   '0x28': function STK_CMD_SET_UP_IDLE_MODE_TEXT(message) {
     DUMP('STK_CMD_SET_UP_IDLE_MODE_TEXT:', message.command.options);
     var options = message.command.options;
-    NotificationHelper.send('STK', options.text, '', function() {
-      icc.alert(message, options.text);
-    });
+    NotificationHelper.send('SIM ' + icc.getSIMNumber(message.iccId) + ' STK',
+      options.text, '', function() {
+        icc.alert(message, options.text);
+      });
     icc.responseSTKCommand(message, {
       resultCode: icc._iccManager.STK_RESULT_OK
     });
