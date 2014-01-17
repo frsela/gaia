@@ -223,9 +223,12 @@ var icc = {
   alert: function icc_alert(stkMessage, message) {
     if (!this.icc_alert) {
       this.icc_alert = document.getElementById('icc-alert');
+      this.icc_alert_iccId = document.getElementById('icc-alert-iccId');
       this.icc_alert_msg = document.getElementById('icc-alert-msg');
       this.icc_alert_btn = document.getElementById('icc-alert-btn');
     }
+
+    this.icc_alert_iccId.textContent = stkMessage.iccId;
 
     var self = this;
     this.icc_alert_btn.onclick = function closeICCalert() {
@@ -243,6 +246,7 @@ var icc = {
   confirm: function(stkMessage, message, timeout, callback) {
     if (!this.icc_confirm) {
       this.icc_confirm = document.getElementById('icc-confirm');
+      this.icc_confirm_iccId = document.getElementById('icc-confirm-iccId');
       this.icc_confirm_msg = document.getElementById('icc-confirm-msg');
       this.icc_confirm_btn = document.getElementById('icc-confirm-btn');
       this.icc_confirm_btn_back =
@@ -254,6 +258,9 @@ var icc = {
     if (typeof callback != 'function') {
       callback = function() {};
     }
+
+    this.icc_confirm_iccId.textContent = stkMessage.iccId;
+
     var self = this;
 
     // STK Default response (BACK and CLOSE)
@@ -296,6 +303,8 @@ var icc = {
     if (!this.icc_asyncconfirm) {
       this.icc_asyncconfirm =
         document.getElementById('icc-asyncconfirm');
+      this.icc_asyncconfirm_iccId =
+        document.getElementById('icc-asyncconfirm-iccId');
       this.icc_asyncconfirm_msg =
         document.getElementById('icc-asyncconfirm-msg');
       this.icc_asyncconfirm_btn_no =
@@ -303,6 +312,8 @@ var icc = {
       this.icc_asyncconfirm_btn_yes =
         document.getElementById('icc-asyncconfirm-btn-yes');
     }
+
+    this.icc_asyncconfirm_iccId.textContent = stkMessage.iccId;
 
     var self = this;
     this.icc_asyncconfirm_btn_no.onclick = function rejectConfirm() {
@@ -385,6 +396,7 @@ var icc = {
 
     if (!this.icc_input) {
       this.icc_input = document.getElementById('icc-input');
+      this.icc_input_iccId = document.getElementById('icc-input-iccId');
       this.icc_input_msg = document.getElementById('icc-input-msg');
       this.icc_input_box = document.getElementById('icc-input-box');
       this.icc_input_btn = document.getElementById('icc-input-btn');
@@ -398,6 +410,8 @@ var icc = {
       callback = function() {};
     }
     setInputTimeout();
+
+    this.icc_input_iccId.textContent = stkMessage.iccId;
 
     // Help
     this.icc_input_btn_help.disabled = !options.isHelpAvailable;
