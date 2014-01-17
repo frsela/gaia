@@ -123,7 +123,7 @@ var icc = {
 
     var cmdId = '0x' + message.command.typeOfCommand.toString(16);
     if (icc_worker[cmdId]) {
-      return icc_worker[cmdId](message, this);
+      return icc_worker[cmdId](message);
     }
 
     DUMP('STK Command not recognized ! - ', message);
