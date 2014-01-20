@@ -228,7 +228,7 @@
         (menu.items.length == 1 && menu.items[0] === null)) {
         DUMP('No STK available - hide & exit');
         document.getElementById('icc-mainheader').hidden = true;
-        document.getElementById('icc-mainentry').hidden = true;
+        document.getElementById('icc-entries').hidden = true;
         return;
       }
 
