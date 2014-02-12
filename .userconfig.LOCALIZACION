@@ -1,0 +1,4 @@
+export GAIA_DEFAULT_LOCALE=es
+export LOCALE_BASEDIR='/home/ssd/OWD/B2G/locales_es/'
+export LOCALES_FILE='/home/ssd/OWD/B2G/locales_es/es/languages_propio.json'
+
