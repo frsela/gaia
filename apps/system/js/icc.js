@@ -238,7 +238,7 @@ var icc = {
       this.icc_alert_btn = document.getElementById('icc-alert-btn');
     }
 
-    this.icc_alert_title.textContent = _('icc-message', {
+    this.icc_alert_title.textContent = _('icc-message-title', {
         'id': this.getSIMNumber(stkMessage.iccId)
       });
 
@@ -272,7 +272,7 @@ var icc = {
       callback = function() {};
     }
 
-    this.icc_confirm_title.textContent = _('icc-message', {
+    this.icc_confirm_title.textContent = _('icc-message-title', {
         'id': this.getSIMNumber(stkMessage.iccId)
       });
 
@@ -329,7 +329,7 @@ var icc = {
         document.getElementById('icc-asyncconfirm-btn-yes');
     }
 
-    this.icc_asyncconfirm_title.textContent = _('icc-message', {
+    this.icc_asyncconfirm_title.textContent = _('icc-message-title', {
         'id': this.getSIMNumber(stkMessage.iccId)
       });
 
@@ -430,7 +430,7 @@ var icc = {
     }
     setInputTimeout();
 
-    this.icc_input_title.textContent = _('icc-inputtitle', {
+    this.icc_input_title.textContent = _('icc-inputbox-title', {
         'id': this.getSIMNumber(stkMessage.iccId)
       });
 
