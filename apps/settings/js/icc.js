@@ -125,21 +125,21 @@
   function setSTKScreenType(type) {
     switch (type) {
       case STK_SCREEN_MAINMENU:
-        exitButton.classList.remove('hidden');
-        backButton.classList.add('hidden');
-        exitHelp.classList.add('hidden');
+        exitButton.hidden = false;
+        backButton.hidden = true;
+        exitHelp.hidden = true;
         break;
 
       case STK_SCREEN_HELP:
-        exitButton.classList.add('hidden');
-        backButton.classList.add('hidden');
-        exitHelp.classList.remove('hidden');
+        exitButton.hidden = true;
+        backButton.hidden = true;
+        helpExit.hidden = false;
         break;
 
       default:  // STK_SCREEN_DEFAULT
-        exitButton.classList.add('hidden');
-        backButton.classList.remove('hidden');
-        exitHelp.classList.add('hidden');
+        exitButton.hidden = true;
+        backButton.hidden = false;
+        exitHelp.hidden = true;
     }
   }
 
