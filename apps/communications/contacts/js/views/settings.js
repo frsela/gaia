@@ -890,8 +890,9 @@ contacts.Settings = (function() {
       var progress = Contacts.showOverlay(
         _('davmailContacts-reading'), 'activityBar');
       var importer = new VCFReader(xhr.response);
-      if (!xhr.response || !importer)
-        return import_error('No contacts were found.', cb);
+      if (!xhr.response || !importer) {
+        return import_error('No contacts were found.'/*, cb*/);
+      }
 
       importer.onread = import_read;
       importer.onimported = imported_contact;
@@ -902,16 +903,16 @@ contacts.Settings = (function() {
           window.importUtils.setTimestamp('sd', function() {
             // Once the timestamp is saved, update the list
             updateTimestamps();
-            checkExport();
+//            checkExport();
             resetWait(wakeLock);
-            if (!cancelled) {
+//            if (!cancelled) {
               Contacts.showStatus(_('davmailContacts-imported3', {
                 n: importedContacts
               }));
-              if (typeof cb === 'function') {
-                cb();
-              }
-            }
+//              if (typeof cb === 'function') {
+//                cb();
+//              }
+//            }
           });
         }, DELAY_FEEDBACK);
       });
