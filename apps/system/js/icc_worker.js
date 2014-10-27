@@ -96,9 +96,6 @@ var icc_worker = {
       return DUMP('Message active, delaying STK...');
     }
 
-    icc.responseSTKCommand(message, {
-      resultCode: icc._iccManager.STK_RESULT_OK
-    });
     if (!options.text) {
       var _ = navigator.mozL10n.get;
       options.text = _('icc-alertMessage-defaultmessage');
@@ -121,9 +118,6 @@ var icc_worker = {
       return DUMP('Message active, delaying STK...');
     }
 
-    icc.responseSTKCommand(message, {
-      resultCode: icc._iccManager.STK_RESULT_OK
-    });
     if (options.text) {
       icc.confirm(message, options.text);
     } else if (options.text != undefined) {
@@ -141,9 +135,6 @@ var icc_worker = {
       return DUMP('Message active, delaying STK...');
     }
 
-    icc.responseSTKCommand(message, {
-      resultCode: icc._iccManager.STK_RESULT_OK
-    });
     if (options.text) {
       icc.alert(message, options.text);
     } else if (options.text == '') {
